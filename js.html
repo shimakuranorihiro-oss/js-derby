@@ -2198,9 +2198,9 @@
             }
 
             if (currentCourseId === 'basic') {
-                fieldSpread *= 0.38; // 基本コースも着差を詰める
+                fieldSpread *= 0.26;
             } else if (currentCourseId === 'sonoda') {
-                fieldSpread *= 0.42; // 園田はさらに凝縮
+                fieldSpread *= 0.28;
             }
 
             let spurtDist = currentCourseId === 'sonoda' ? Math.min(800, total_dist * 0.42) : Math.min(800, total_dist * 0.35);
@@ -2291,8 +2291,8 @@
                 }
             }
 
-            let personalDistOffset = ((horse.horseNum * 3.7) % 15) - 7.5; 
-            targetDistMax = 20 + personalDistOffset; 
+            let personalDistOffset = ((horse.horseNum * 3.7) % 10) - 5.0; // 個体差を縮小
+            targetDistMax = 13 + personalDistOffset; // 先頭との目標距離を短縮
 
             // 3コーナー（スパート手前250m、園田はコースが小さいため150m）の進入距離を定義
             let threeCornerDist = spurtDist + (currentCourseId === 'sonoda' ? 200 : 250);
@@ -3436,18 +3436,23 @@
             let finalStraightLen = L;
             
             if (currentCourseId === 'sonoda') {
+                // 長距離ほど道中のスピードを落として勝負所からの速度感を統一
+                let midSpeed = total_dist >= 2400 ? 0.48
+                             : total_dist >= 1870 ? 0.54
+                             : total_dist >= 1700 ? 0.60
+                             : 0.80;
                 if (remainToGoal <= finalStraightLen) {
-                    speedMultiplier = 0.18; 
+                    speedMultiplier = 0.18;
                 } else if (remainToGoal <= finalStraightLen + 300) {
                     let ratio = (remainToGoal - finalStraightLen) / 300;
-                    speedMultiplier = 0.18 + (0.42 * ratio); 
+                    speedMultiplier = 0.18 + ((midSpeed - 0.18) * ratio);
                 } else if (currentDist < 400) {
                     speedMultiplier = 0.45;
                 } else if (currentDist < 800) {
                     let ratio = (currentDist - 400) / 400;
-                    speedMultiplier = 0.45 + (0.35 * ratio); 
+                    speedMultiplier = 0.45 + ((midSpeed - 0.45) * ratio);
                 } else {
-                    speedMultiplier = 0.8;
+                    speedMultiplier = midSpeed;
                 }
             } else {
                 if (remainToGoal <= finalStraightLen) {
