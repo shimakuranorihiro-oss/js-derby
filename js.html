@@ -1263,23 +1263,23 @@
         // ==========================================
         function spawnHorseParticles(horse) {
             if (!isRacing || horse.isGoal || horse.startDelay > 0) return;
-            if (Math.random() > 0.45) return;
+            if (Math.random() > 0.18) return; // 確率を大幅に下げる
 
             let pos = getTrackPos(start_dist + horse.run_dist, horse.lane);
             let angle = getTrackAngle(start_dist + horse.run_dist, currentCourseId);
-            let numP = currentSurface === 'dirt' ? 3 : 2;
+            let numP = currentSurface === 'dirt' ? 2 : 1; // 粒数を減らす
 
             for (let i = 0; i < numP; i++) {
-                let spread = (Math.random() - 0.5) * 10;
-                let backSpeed = Math.random() * 2.0 + 0.8;
+                let spread = (Math.random() - 0.5) * 7;
+                let backSpeed = Math.random() * 1.4 + 0.5;
                 particles.push({
-                    x: pos.x - Math.cos(angle) * 6 + (Math.random() - 0.5) * 4,
-                    y: pos.y - Math.sin(angle) * 6 + (Math.random() - 0.5) * 4,
-                    vx: -Math.cos(angle) * backSpeed + Math.sin(angle) * spread * 0.25,
-                    vy: -Math.sin(angle) * backSpeed - Math.cos(angle) * spread * 0.25 - Math.random() * 0.5,
+                    x: pos.x - Math.cos(angle) * 5 + (Math.random() - 0.5) * 3,
+                    y: pos.y - Math.sin(angle) * 5 + (Math.random() - 0.5) * 3,
+                    vx: -Math.cos(angle) * backSpeed + Math.sin(angle) * spread * 0.2,
+                    vy: -Math.sin(angle) * backSpeed - Math.cos(angle) * spread * 0.2 - Math.random() * 0.4,
                     life: 1.0,
-                    decay: currentSurface === 'dirt' ? (0.018 + Math.random() * 0.015) : (0.035 + Math.random() * 0.02),
-                    radius: currentSurface === 'dirt' ? (Math.random() * 3.0 + 1.0) : (Math.random() * 1.8 + 0.6),
+                    decay: currentSurface === 'dirt' ? (0.028 + Math.random() * 0.018) : (0.05 + Math.random() * 0.025),
+                    radius: currentSurface === 'dirt' ? (Math.random() * 2.0 + 0.6) : (Math.random() * 1.2 + 0.4),
                     isDirt: currentSurface === 'dirt'
                 });
             }
@@ -3959,15 +3959,16 @@
             aiPredictionBtn.disabled = false;
 
             // 着差を馬身表示に変換
+            // 1馬身 ≒ 7.2ゲーム単位（馬体長18 * scale1.2 / TRACK_SCALE3）
             function gapToText(gap) {
                 if (gap === 0) return '';
-                if (gap < 0.4) return 'ハナ';
-                if (gap < 0.9) return 'クビ';
-                if (gap < 2.0) return '1/2馬身';
-                if (gap < 3.5) return '1馬身';
-                if (gap < 6.0) return '2馬身';
-                if (gap < 10.0) return '3馬身';
-                if (gap < 20.0) return '5馬身';
+                if (gap < 1.2) return 'ハナ';
+                if (gap < 2.8) return 'クビ';
+                if (gap < 5.0) return '1/2馬身';
+                if (gap < 9.5) return '1馬身';
+                if (gap < 17.0) return '2馬身';
+                if (gap < 27.0) return '3馬身';
+                if (gap < 48.0) return '5馬身';
                 return '大差';
             }
 
