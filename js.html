@@ -2187,7 +2187,8 @@
             horse.blocked = false;
             horse.isBattling = false; 
 
-            let fieldSpread = Math.max(1.0, total_dist / 2000); 
+            // 長距離でも馬群が広がりすぎないよう上限を設ける
+            let fieldSpread = Math.max(1.0, Math.min(1.25, total_dist / 2000));
             if (cPace === 'high') {
                 fieldSpread *= 2.2; 
             } else if (cPace === 'slow') {
@@ -2322,9 +2323,14 @@
                 }
             }
 
-            if (remainToGoal > spurtDist) { 
+            if (remainToGoal > spurtDist) {
                 currentSpeed *= paceSpeedMod;
                 staminaCost *= paceStaminaMod;
+
+                // 長距離ほど勝負どころまでスタミナを温存（道中は省エネで走る）
+                // 1800m以下：変化なし / 2400m：25%節約 / 3200m：44%節約
+                let distConserve = Math.min(1.0, Math.max(0.55, 1800 / total_dist));
+                staminaCost *= distConserve;
 
                 let isRearPushing = false;
                 allHorses.forEach(h => {
@@ -2961,10 +2967,11 @@
             horse.currentVelocity += acceleration;
 
             // 基本スタミナ消費倍率（baseDrainRate）をマイルドに調整
-            let baseDrainRate = currentCourseId === 'basic' ? 0.038 : 0.044; 
+            let baseDrainRate = currentCourseId === 'basic' ? 0.038 : 0.044;
             let distFactor = 2400 / total_dist;
-            if (total_dist > 2400) distFactor = Math.pow(distFactor, 1.05); 
-            else if (total_dist < 2400) distFactor = Math.pow(distFactor, 0.85); // 0.88 -> 0.85 (短い距離ほどスタミナに余裕を持たせる)
+            // 長距離ほどbaseDrainRateを下げる（distConserveと二重効果）
+            if (total_dist > 2400) distFactor = Math.pow(distFactor, 1.12);
+            else if (total_dist < 2400) distFactor = Math.pow(distFactor, 0.85);
             const staminaDrainRate = baseDrainRate * distFactor; 
             
             let cornerPenalty = 1.0;
