@@ -2808,33 +2808,79 @@
             }
 
             if (isCorner) {
-                // コーナーの距離ロスを強化
+                // コーナーの距離ロス
                 let cornerPower = currentCourseId === 'sonoda' ? 2.0 : 1.6;
                 currentSpeed *= Math.pow(R / actualR, cornerPower);
 
-                // インコース（lane < 3）：馬場が荒れて走りづらい
+                // インコース（lane < 3）：内を通ってスムーズに回るが馬場が荒れる
+                // 速度は保ちやすい（省エネ）、ただし加速しようとすると外に膨れる
                 if (horse.lane < 3.0) {
-                    let innerPenalty = (3.0 - horse.lane) * 0.022;
-                    currentSpeed *= (1.0 - innerPenalty);
-                    staminaCost *= 1.0 + innerPenalty * 0.8;
+                    let innerFactor = (3.0 - horse.lane) / 3.0; // 0〜1
+                    // 速度ロスは軽め（内を回る分距離が短いので）
+                    currentSpeed *= (1.0 - innerFactor * 0.012);
+                    // スタミナは若干消費（荒れた馬場）
+                    staminaCost *= 1.0 + innerFactor * 0.05;
                 }
 
-                // アウトコース（lane > 10）：内側から抜かれないよう自然にスピードアップ（スタミナ消費増）
-                if (horse.lane > 10.0) {
-                    let outerBoost = (horse.lane - 10.0) * 0.013;
-                    currentSpeed *= (1.0 + outerBoost);
-                    staminaCost *= 1.0 + outerBoost * 2.5;
+                // アウトコース（lane > 8）：距離が長い分スピードを上げてカバー（スタミナ消費大）
+                if (horse.lane > 8.0) {
+                    let outerFactor = (horse.lane - 8.0) / 10.0;
+                    currentSpeed *= (1.0 + outerFactor * 0.022);
+                    staminaCost *= 1.0 + outerFactor * 0.12;
                 }
 
-                // 外回りスタミナペナルティ（既存・維持）
+                // 全体の外回りスタミナペナルティ
                 if (horse.lane > 3.0) {
                     let staminaPenalty = currentCourseId === 'sonoda' ? 0.038 : 0.025;
                     staminaCost *= 1.0 + (horse.lane - 3.0) * staminaPenalty;
+                }
+
+                // 遠心力ドリフト：コーナーで速度が高いほど外に膨れる
+                if (!isSim) {
+                    let baseV = horse.actualSpeedBase;
+                    let overSpeed = currentSpeed - baseV * 1.02;
+                    if (overSpeed > 0 && horse.currentStamina > 0) {
+                        let driftStrength = currentCourseId === 'sonoda' ? 0.06 : 0.04;
+                        targetLane += overSpeed * driftStrength;
+                        targetLane = Math.min(targetLane, 17);
+                    }
                 }
             } else {
                 if (horse.lane < 3.0 && currentSurface === 'turf') {
                     currentSpeed *= 1.0 + ((3.0 - horse.lane) * 0.0015);
                 }
+            }
+
+            // ==========================================
+            // 接触システム：近くの馬と当たってスピード・スタミナを削る
+            // ==========================================
+            if (!isSim) {
+                allHorses.forEach(other => {
+                    if (other === horse || other.isGoal || horse.isGoal) return;
+                    let distDiff = Math.abs(other.run_dist - horse.run_dist);
+                    let laneDiff = Math.abs(other.lane - horse.lane);
+
+                    if (distDiff < 2.5 && laneDiff < 0.9 && laneDiff > 0.05) {
+                        let severity = (1.0 - laneDiff / 0.9) * (1.0 - distDiff / 2.5);
+                        severity = Math.min(0.6, severity);
+
+                        // 両馬ともスピード・スタミナにダメージ
+                        currentSpeed *= (1.0 - 0.04 * severity);
+                        horse.currentStamina -= 0.6 * severity * speedMultiplier;
+                        horse.isBattling = true;
+
+                        // 外側の馬は外にはじかれ、内側の馬は内に戻る
+                        if (!isSim) {
+                            if (other.lane > horse.lane) {
+                                // 自分がインコース側 → 相手が外に押し出される
+                                targetLane = Math.max(0, targetLane - 0.15 * severity);
+                            } else {
+                                // 自分がアウトコース側 → 自分が外に押し出される
+                                targetLane = Math.min(17, targetLane + 0.25 * severity);
+                            }
+                        }
+                    }
+                });
             }
 
             currentSpeed *= (Math.random() * 0.15 + 0.925); 
