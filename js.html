@@ -798,8 +798,10 @@
         let ikkiAnnounced = false; 
         let isPhotoFinishTriggered = false;
         let cameraX = 0, cameraY = 0, cameraScale = 1.0, cinemaBarHeight = 0;
+        let cameraShakeIntensity = 0;
         let frameCount = 0;
         let raceStartTime = 0;
+        let particles = [];
         let frameHistory = []; 
         let isCoolDown = false; 
         
@@ -1164,9 +1166,11 @@
             cameraY = 0;
             cinemaBarHeight = 0;
             frameCount = 0;
-            frameHistory = []; 
-            isCoolDown = false; 
-            activeSkillCutins = []; 
+            frameHistory = [];
+            isCoolDown = false;
+            activeSkillCutins = [];
+            particles = [];
+            cameraShakeIntensity = 0;
             
             gateOffset = 0;
             isGateMoving = false;
@@ -1252,6 +1256,62 @@
                 let theta = (d - (2 * cL + Math.PI * cR)) / cR;
                 return Math.atan2(Math.sin(theta), Math.cos(theta));
             }
+        }
+
+        // ==========================================
+        // パーティクル（砂埃・草）システム
+        // ==========================================
+        function spawnHorseParticles(horse) {
+            if (!isRacing || horse.isGoal || horse.startDelay > 0) return;
+            if (Math.random() > 0.45) return;
+
+            let pos = getTrackPos(start_dist + horse.run_dist, horse.lane);
+            let angle = getTrackAngle(start_dist + horse.run_dist, currentCourseId);
+            let numP = currentSurface === 'dirt' ? 3 : 2;
+
+            for (let i = 0; i < numP; i++) {
+                let spread = (Math.random() - 0.5) * 10;
+                let backSpeed = Math.random() * 2.0 + 0.8;
+                particles.push({
+                    x: pos.x - Math.cos(angle) * 6 + (Math.random() - 0.5) * 4,
+                    y: pos.y - Math.sin(angle) * 6 + (Math.random() - 0.5) * 4,
+                    vx: -Math.cos(angle) * backSpeed + Math.sin(angle) * spread * 0.25,
+                    vy: -Math.sin(angle) * backSpeed - Math.cos(angle) * spread * 0.25 - Math.random() * 0.5,
+                    life: 1.0,
+                    decay: currentSurface === 'dirt' ? (0.018 + Math.random() * 0.015) : (0.035 + Math.random() * 0.02),
+                    radius: currentSurface === 'dirt' ? (Math.random() * 3.0 + 1.0) : (Math.random() * 1.8 + 0.6),
+                    isDirt: currentSurface === 'dirt'
+                });
+            }
+        }
+
+        function updateParticles() {
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.08; // 重力
+                p.vx *= 0.96;
+                p.life -= p.decay;
+            });
+            particles = particles.filter(p => p.life > 0);
+            if (particles.length > 400) particles = particles.slice(-400);
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                let alpha = p.life * 0.65;
+                let r = p.radius * (0.4 + p.life * 0.6);
+                if (p.isDirt) {
+                    let bright = Math.floor(140 + p.life * 50);
+                    ctx.fillStyle = `rgba(${bright}, ${Math.floor(bright * 0.78)}, ${Math.floor(bright * 0.45)}, ${alpha})`;
+                } else {
+                    let g = Math.floor(130 + p.life * 70);
+                    ctx.fillStyle = `rgba(60, ${g}, 40, ${alpha})`;
+                }
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, Math.max(0.3, r), 0, Math.PI * 2);
+                ctx.fill();
+            });
         }
 
         // ==========================================
@@ -1388,7 +1448,15 @@
                     targetY = canvas.height * 0.5 - (avgY * targetScale);
                 }
                 
-                let smooth = (remainToGoal >= finalStraightLen + 50) ? 0.08 : 0.06;
+                // 直線入口は素早くズーム、コーナーは緩やかに追従
+                let isOnCorner = false;
+                if (leaderHorse) {
+                    let d = ((( start_dist + leaderHorse.run_dist) % C) + C) % C;
+                    isOnCorner = (d >= L && d < L + Math.PI * R) || (d >= 2 * L + Math.PI * R);
+                }
+                let smooth = remainToGoal >= finalStraightLen + 50
+                    ? (isOnCorner ? 0.05 : 0.09)
+                    : 0.07;
                 cameraScale += (targetScale - cameraScale) * smooth;
                 cameraX += (targetX - cameraX) * smooth;
                 cameraY += (targetY - cameraY) * smooth;
@@ -1449,7 +1517,14 @@
                 }
             }
 
-            ctx.translate(cameraX, cameraY);
+            // カメラシェイク
+            let shakeX = 0, shakeY = 0;
+            if (cameraShakeIntensity > 0.1) {
+                shakeX = (Math.random() - 0.5) * cameraShakeIntensity;
+                shakeY = (Math.random() - 0.5) * cameraShakeIntensity;
+                cameraShakeIntensity *= 0.82;
+            }
+            ctx.translate(cameraX + shakeX, cameraY + shakeY);
             ctx.scale(cameraScale, cameraScale);
 
             // --- コースの描画 ---
@@ -1969,7 +2044,10 @@
                 }
             });
 
-            ctx.restore(); 
+            // パーティクル描画（カメラ変換内）
+            if (isRacing && !isCoolDown) drawParticles();
+
+            ctx.restore();
 
             if (cameraScale > 1.05) {
                 cinemaBarHeight += (40 - cinemaBarHeight) * 0.1;
@@ -2163,9 +2241,10 @@
                         horse.skillUsed = true;
                         horse.skillTimer = 180; 
                         if (!isSim && skillCutinEnabled && activeSkillCutins.length < 3) {
+                            cameraShakeIntensity = Math.max(cameraShakeIntensity, 4);
                             activeSkillCutins.push({
                                 horse: horse,
-                                time: 90, 
+                                time: 90,
                                 maxTime: 90
                             });
                         }
@@ -3273,6 +3352,7 @@
         function raceLoop() {
             if (!isRacing) return;
             frameCount++;
+            updateParticles();
             
             if (frameCount > 0) {
                 isGateMoving = true;
@@ -3350,6 +3430,9 @@
 
                 moveHorse(horse, horses, currentLeader, currentPace, speedMultiplier, false);
 
+                // パーティクル生成
+                spawnHorseParticles(horse);
+
                 if (horse.run_dist >= total_dist && !horse.isGoal) {
                     horse.isGoal = true;
                     horse.finishFrame = frameCount; 
@@ -3367,6 +3450,7 @@
                         let gap = second ? horse.run_dist - second.run_dist : 99;
                         if (gap <= 3.0) {
                             isPhotoFinishTriggered = true;
+                            cameraShakeIntensity = 8;
                             commentary.innerText = `ゴーーール！！ 1着争いは大接戦！ 写真判定か！？`;
                         } else if (gap < 8) {
                             const lines = [
