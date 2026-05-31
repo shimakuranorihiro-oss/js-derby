@@ -3978,13 +3978,13 @@
                 if (currentCourseId === 'sonoda') {
                     // 園田競馬場の実際の平均タイムに合わせたスケール
                     // 820m:0:52 / 1230m:1:17 / 1400m:1:28 / 1700m:1:47 / 1870m:1:58 / 2400m:2:35
-                    const sonodaScale = { 820: 3.85, 1230: 3.81, 1400: 3.83, 1700: 3.82, 1870: 3.83, 2400: 3.92 };
-                    scale = sonodaScale[total_dist] || 3.83;
+                    const sonodaScale = { 820: 1.93, 1230: 1.91, 1400: 1.92, 1700: 1.91, 1870: 1.92, 2400: 1.96 };
+                    scale = sonodaScale[total_dist] || 1.92;
                 } else {
                     // JRA基本コースの平均タイム
                     // 1200m:1:09 / 1600m:1:34 / 2000m:1:59 / 2400m:2:24 / 3200m:3:15
-                    const basicScale = { 1200: 3.26, 1600: 3.33, 2000: 3.37, 2400: 3.40, 3200: 3.46 };
-                    scale = basicScale[total_dist] || 3.35;
+                    const basicScale = { 1200: 1.63, 1600: 1.67, 2000: 1.69, 2400: 1.70, 3200: 1.73 };
+                    scale = basicScale[total_dist] || 1.68;
                 }
                 const realSec = gameSeconds * scale;
                 const m = Math.floor(realSec / 60);
