@@ -457,7 +457,7 @@
             ['ミッキーロケット', 'senko', 'turf', 2400, 'A', '宝塚記念制覇'],
             ['ラブリーデイ', 'senko', 'turf', 2000, 'S', '宝塚記念制覇'],
             ['ミッキークイーン', 'sashi', 'turf', 2400, 'A', 'オークス馬'],
-            ['show_nand_pandora', 'sashi', 'turf', 2400, 'A', 'ジャパンC制覇'],
+            ['ショウナンパンドラ', 'sashi', 'turf', 2400, 'A', 'ジャパンC制覇'],
             ['ヴィルシーナ', 'nige', 'turf', 1600, 'A', 'ヴィクトリアM連覇']
         ];
 
@@ -532,16 +532,16 @@
             ['エーシンサンバ', 'senko', 'dirt', 1400, 'A', 'スプリント実績'],
             ['タガノギャラクシー', 'sashi', 'dirt', 1400, 'B', '短距離実績'],
             ['サンライズバッカス', 'oikomi', 'dirt', 1870, 'S', 'フェブラリーS馬'], 
-            ['smart_falcon', 'nige', 'dirt', 1870, 'S', '砂のハヤブサ'], 
+            ['スマートファルコン', 'nige', 'dirt', 1870, 'S', '砂のハヤブサ'],
             ['ホッコータルマエ', 'senko', 'dirt', 1870, 'S', '苫小牧の星'], 
             ['コパノリッキー', 'nige', 'dirt', 1870, 'S', 'G1最多勝'], 
             ['クリソベリル', 'senko', 'dirt', 1870, 'S', '無敗 of 砂王'], 
             ['オメガパフューム', 'oikomi', 'dirt', 1870, 'S', '大井の鬼'], 
             ['ケイティブレイブ', 'senko', 'dirt', 1870, 'S', '帝王賞馬'], 
             ['アウォーディー', 'senko', 'dirt', 1870, 'S', '遅咲きのダート王'], 
-            ['サウンドトゥルー', 'oikomi', 'dirt', 1870, 'S', '末脚炸裂'], 
+            ['サウンドトゥルー', 'oikomi', 'dirt', 1870, 'A', '末脚炸裂'],
             ['ルヴァンスレーヴ', 'sashi', 'dirt', 1870, 'S', '砂の怪物'], 
-            ['gold_dream', 'sashi', 'dirt', 1870, 'S', 'ダートG1多数制覇'], 
+            ['ゴールドドリーム', 'sashi', 'dirt', 1870, 'S', 'ダートG1多数制覇'],
             ['ノンコノユメ', 'oikomi', 'dirt', 1870, 'S', '豪快な追い込み'], 
             ['サクセスブロッケン', 'senko', 'dirt', 1870, 'S', 'フェブラリー制覇'], 
             ['インティ', 'nige', 'dirt', 1870, 'S', '逃げてフェブラリー制覇'], 
@@ -571,7 +571,7 @@
             ['トーホウエンペラー', 'sashi', 'dirt', 2000, 'S', '岩手の帝王'],
             ['ロースター', 'senko', 'dirt', 1400, 'A', '高知の星'],
             ['レジェンドハンター', 'nige', 'dirt', 1400, 'S', '笠松の伝説'],
-            ['маキバスナイパー', 'senko', 'dirt', 2000, 'S', '帝王賞制覇'],
+            ['マキバスナイパー', 'senko', 'dirt', 2000, 'S', '帝王賞制覇'],
             ['サプライズパワー', 'sashi', 'dirt', 2000, 'A', '船橋の雄'],
             ['テツノカチドキ', 'sashi', 'dirt', 2000, 'S', '大井の名馬'],
             ['ライデンリーダー', 'oikomi', 'dirt', 1600, 'A', '笠松のヒロイン'],
@@ -594,7 +594,7 @@
             ['イナリワン', 'oikomi', 'dirt', 2000, 'S', '大井から中央へ'],
             ['オグリキャップ', 'sashi', 'dirt', 1600, 'S', '笠松の怪物'],
             ['ハヤテサカエオー', 'nige', 'dirt', 1600, 'A', '園田アラブの星'],
-            ['アサぎり', 'senko', 'dirt', 1600, 'A', '兵庫アラブ名馬'],
+            ['アサギリ', 'senko', 'dirt', 1600, 'A', '兵庫アラブ名馬'],
             ['ローゼンホーマ', 'sashi', 'dirt', 2000, 'S', '福山アラブの怪物'],
             ['スイグン', 'oikomi', 'dirt', 1800, 'A', '福山の差し馬'],
             ['ヤングメネラオス', 'senko', 'dirt', 1600, 'A', '福山からの使者'],
@@ -611,7 +611,7 @@
             ['ブルドッグボス', 'sashi', 'dirt', 1200, 'S', 'JBCスプリント馬'],
             ['コーリンベリー', 'nige', 'dirt', 1400, 'S', 'JBCスプリント逃げ切り'],
             ['ダノンレジェンド', 'senko', 'dirt', 1400, 'S', 'JBCスプリント圧勝'],
-            ['スーニ', 'oikomi', 'dirt', 1400, 'S', 'JBCスプリント連覇'],
+            ['スーニ', 'oikomi', 'dirt', 1400, 'A', 'JBCスプリント連覇'],
             ['ミツアキサイレンス', 'sashi', 'dirt', 2000, 'A', '笠松の雄']
         ];
 
@@ -771,13 +771,15 @@
             if (horse.surf === 'both') { speedMod = 1.0; staminaMod = 1.0; }
 
             if (total_dist < horse.distMin) {
-                speedMod = 0.94; 
-                staminaMod = 1.1; 
+                speedMod = 0.94;
+                staminaMod = 1.1;
             } else if (total_dist > horse.distMax) {
-                speedMod = 1.02; 
-                staminaMod = 0.80; 
+                // 距離オーバー：速度もスタミナも両方ペナルティ
+                let over = Math.min((total_dist - horse.distMax) / 400, 1.0);
+                speedMod = 0.96 - over * 0.04;   // 最大0.92倍まで低下
+                staminaMod = 0.78 - over * 0.06; // 最大0.72倍まで低下
             } else {
-                speedMod = 1.02; staminaMod = 1.05; 
+                speedMod = 1.02; staminaMod = 1.05;
             }
             return { speedMod, staminaMod };
         }
@@ -1104,11 +1106,11 @@
                 let makuriProb = 0;
                 let ikkiProb = 0;
                 if (h.type === 'sashi' || h.type === 'oikomi') {
-                    makuriProb = currentCourseId === 'sonoda' ? 0.5 : 0.05; 
+                    makuriProb = currentCourseId === 'sonoda' ? 0.3 : 0.05;
                     ikkiProb = currentCourseId === 'sonoda' ? 0.05 : 0.4;
 
                     if (h.skillName === '不沈艦、抜錨！' || h.skillName === '大まくり') {
-                        makuriProb += currentCourseId === 'sonoda' ? 0.4 : 0.3;
+                        makuriProb += currentCourseId === 'sonoda' ? 0.1 : 0.3;
                     }
                     if (h.skillName === '飛ぶような末脚' || h.skillName === '鬼の末脚' || h.skillName === '世界一の末脚' || h.skillName === '豪快な差し切り' || h.skillName === '鬼脚炸裂') {
                         ikkiProb += 0.4;
@@ -2063,10 +2065,12 @@
             }
 
             if (currentCourseId === 'basic') {
-                fieldSpread *= 0.45; 
+                fieldSpread *= 0.45;
+            } else if (currentCourseId === 'sonoda') {
+                fieldSpread *= 0.55; // 園田は道中からギュッと凝縮
             }
 
-            let spurtDist = currentCourseId === 'sonoda' ? Math.min(800, total_dist * 0.55) : Math.min(800, total_dist * 0.35);
+            let spurtDist = currentCourseId === 'sonoda' ? Math.min(800, total_dist * 0.42) : Math.min(800, total_dist * 0.35);
 
             if (horse.isChokusenIkki) {
                 spurtDist = currentCourseId === 'sonoda' ? 250 : 550; 
@@ -2157,13 +2161,15 @@
             targetDistMax = 20 + personalDistOffset; 
 
             // 3コーナー（スパート手前250m、園田はコースが小さいため150m）の進入距離を定義
-            let threeCornerDist = spurtDist + (currentCourseId === 'sonoda' ? 150 : 250);
+            let threeCornerDist = spurtDist + (currentCourseId === 'sonoda' ? 200 : 250);
 
             // 3コーナーに差し掛かった馬は、先頭との距離を詰めるため、目標最大距離（targetDistMax）を徐々に小さくする（ギュッと凝縮する）
             if (remainToGoal > spurtDist && remainToGoal < threeCornerDist) {
                 let range = threeCornerDist - spurtDist;
-                let ratio = (remainToGoal - spurtDist) / range; // 1.0 (3角手前) -> 0.0 (スパート開始)
-                let compression = 0.35 + 0.65 * ratio; // 本来の目標最大距離を最終的に35%まで圧縮
+                let ratio = (remainToGoal - spurtDist) / range;
+                let compression = currentCourseId === 'sonoda'
+                    ? 0.30 + 0.70 * ratio  // 園田：圧縮を緩めて逃げ馬が粘れるように
+                    : 0.35 + 0.65 * ratio;
                 if (horse.type !== 'nige') {
                     targetDistMax *= compression;
                 }
@@ -2223,23 +2229,23 @@
                     if (horse.makuriTriggered) {
                         if (horse.makuriProgress === undefined) horse.makuriProgress = 0;
                         
-                        let progressRate = currentCourseId === 'sonoda' ? 0.00010 : 0.0010;
+                        let progressRate = currentCourseId === 'sonoda' ? 0.00004 : 0.0010;
                         horse.makuriProgress += progressRate * speedMultiplier;
-                        
+
                         let progress = Math.min(1.0, horse.makuriProgress);
-                        
-                        let maxBonus = currentCourseId === 'sonoda' ? 0.003 : 0.010; 
-                        let catchUpFactorBase = currentCourseId === 'sonoda' ? 0.00004 : 0.00012; 
-                        
-                        catchUpFactor = 1.0 + (distToLeader - targetDistMax) * catchUpFactorBase * Math.pow(progress, 1.5); 
-                        
+
+                        let maxBonus = currentCourseId === 'sonoda' ? 0.003 : 0.010;
+                        let catchUpFactorBase = currentCourseId === 'sonoda' ? 0.00003 : 0.00012;
+
+                        catchUpFactor = 1.0 + (distToLeader - targetDistMax) * catchUpFactorBase * Math.pow(progress, 1.5);
+
                         if (distToLeader < 12.0) {
                             let damp = Math.max(0.0, distToLeader / 12.0);
                             catchUpFactor = 1.0 + (catchUpFactor - 1.0) * damp;
                         }
-                        
-                        catchUpFactor = Math.min(1.10, catchUpFactor); // まくりの最大倍率を1.10倍に制限
-                        maxCatchUp = 1.10; 
+
+                        catchUpFactor = Math.min(1.07, catchUpFactor); // まくりの最大倍率を1.07倍に制限
+                        maxCatchUp = 1.07;
                         minCatchUp = 1.00 + (0.02 * progress); 
                     }
                     currentSpeed *= Math.min(maxCatchUp, Math.max(minCatchUp, catchUpFactor)); 
@@ -2302,31 +2308,39 @@
                 
                 let courseSpurtMod = currentCourseId === 'basic' ? 1.12 : 0.95; // スパート全体のスタミナ消費倍率引き下げ
                 
-                let spStNige = 1.20, spStSenko = 1.25, spStSashi = 1.35, spStOikomi = 1.45; // スパートスタミナ基準値全体引き下げ
+                let spStNige = 1.20, spStSenko = 1.25, spStSashi = 1.35, spStOikomi = 1.45;
                 if (currentCourseId === 'basic') {
                     spStNige = 1.28;
                     spStSenko = 1.28;
-                    spStSashi = 1.10; 
-                    spStOikomi = 1.02; 
+                    spStSashi = 1.10;
+                    spStOikomi = 1.02;
                 }
 
-                if(horse.type === 'nige') { spurtSpeedMulti = 0.92 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
-                else if(horse.type === 'senko') { spurtSpeedMulti = 1.03 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
-                else if(horse.type === 'sashi') { spurtSpeedMulti = 1.15 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
-                else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.25 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
+                if (currentCourseId === 'sonoda') {
+                    // 園田：逃げ・先行の粘りを強化、差し・追込の爆発力を抑制してバランスを均等化
+                    if(horse.type === 'nige') { spurtSpeedMulti = 0.97 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
+                    else if(horse.type === 'senko') { spurtSpeedMulti = 1.09 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
+                    else if(horse.type === 'sashi') { spurtSpeedMulti = 1.09 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
+                    else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.16 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
+                } else {
+                    if(horse.type === 'nige') { spurtSpeedMulti = 0.92 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
+                    else if(horse.type === 'senko') { spurtSpeedMulti = 1.03 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
+                    else if(horse.type === 'sashi') { spurtSpeedMulti = 1.15 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
+                    else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.25 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
+                }
 
                 let catchUpBonus = 1.0;
                 if (distToLeader > 3 && horse.currentStamina > 0) {
-                    let catchUpRate = currentCourseId === 'basic' ? 0.0060 : 0.0020; 
-                    
+                    let catchUpRate = currentCourseId === 'basic' ? 0.0060 : 0.0026;
+
                     if (!horse.makuriTriggered && (horse.type === 'sashi' || horse.type === 'oikomi') && horse.currentStamina > 25) {
-                        catchUpRate *= 1.3;
+                        catchUpRate *= currentCourseId === 'sonoda' ? 1.3 : 1.3;
                     }
 
-                    catchUpBonus = 1.0 + (distToLeader * catchUpRate); 
-                    let maxCatchUpSpurt = currentCourseId === 'basic' ? 1.30 : 1.13; 
-                    catchUpBonus = Math.min(maxCatchUpSpurt, catchUpBonus); 
-                    
+                    catchUpBonus = 1.0 + (distToLeader * catchUpRate);
+                    let maxCatchUpSpurt = currentCourseId === 'basic' ? 1.30 : 1.16;
+                    catchUpBonus = Math.min(maxCatchUpSpurt, catchUpBonus);
+
                     if (currentCourseId === 'basic' && (horse.type === 'oikomi' || horse.type === 'sashi')) {
                         catchUpBonus *= 1.04;
                     }
@@ -2788,9 +2802,9 @@
                 let makuriProb = 0;
                 let ikkiProb = 0;
                 if (h.type === 'sashi' || h.type === 'oikomi') {
-                    makuriProb = currentCourseId === 'sonoda' ? 0.5 : 0.05; 
+                    makuriProb = currentCourseId === 'sonoda' ? 0.3 : 0.05;
                     ikkiProb = currentCourseId === 'sonoda' ? 0.05 : 0.4;
-                    if (h.skillName === '不沈艦、抜錨！' || h.skillName === '大まくり') { makuriProb += currentCourseId === 'sonoda' ? 0.4 : 0.3; }
+                    if (h.skillName === '不沈艦、抜錨！' || h.skillName === '大まくり') { makuriProb += currentCourseId === 'sonoda' ? 0.1 : 0.3; }
                     if (h.skillName === '飛ぶような末脚' || h.skillName === '鬼の末脚' || h.skillName === '世界一の末脚' || h.skillName === '豪快な差し切り' || h.skillName === '鬼脚炸裂') { ikkiProb += 0.4; }
                 }
                 
