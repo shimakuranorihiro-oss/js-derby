@@ -2805,12 +2805,52 @@
             if (horse.lane < 0) horse.lane = 0;
             if (horse.lane > 21) horse.lane = 21; 
 
-            if (currentCourseId === 'sonoda') {
-                let sandDepth = Math.max(0, 8.0 - horse.lane) / 8.0; 
-                if (sandDepth > 0) {
-                    currentSpeed *= (1.0 - 0.06 * sandDepth); 
-                    staminaCost *= (1.0 + 0.12 * sandDepth); // 砂によるスタミナ負荷軽減
+            // ==========================================
+            // コース・レーン別バイアス（8ゾーン）
+            // 園田ダート：内が砂深くて遅い、外が砂浅くて速い
+            // 基本コース（芝）：内が芝荒れ、外がフレッシュ
+            // ==========================================
+            {
+                // zone 0〜7（lane 0-2 / 2-4 / 4-6 / 6-8 / 8-10 / 10-12 / 12-14 / 14+）
+                const zoneIdx = Math.min(7, Math.floor(horse.lane / 2));
+
+                let biasSpdMod = 0.0;  // 速度への加算（マイナス＝遅い）
+                let biasStaMod = 0.0;  // スタミナ消費への加算（プラス＝増加）
+
+                if (currentCourseId === 'sonoda') {
+                    // 園田競馬場ダート：内ほど砂が深くて負荷大、外ほど砂が浅くて軽快
+                    const sonodaBias = [
+                    //  [speedMod, staminaMod]  レーン帯
+                        [-0.09, +0.18],  // zone 0: lane 0-2   最内・砂最深・最も不利
+                        [-0.07, +0.14],  // zone 1: lane 2-4   深め
+                        [-0.04, +0.08],  // zone 2: lane 4-6   やや深い
+                        [-0.02, +0.04],  // zone 3: lane 6-8   若干深い
+                        [ 0.00,  0.00],  // zone 4: lane 8-10  基準（中間）
+                        [+0.01, -0.02],  // zone 5: lane 10-12 やや浅い
+                        [+0.02, -0.03],  // zone 6: lane 12-14 浅い・走りやすい
+                        [+0.02, -0.03],  // zone 7: lane 14+   最外・砂最浅
+                    ];
+                    biasSpdMod = sonodaBias[zoneIdx][0];
+                    biasStaMod = sonodaBias[zoneIdx][1];
+                } else {
+                    // 基本コース（芝）：内が荒れ、外がフレッシュ
+                    const basicBias = [
+                    //  [speedMod, staminaMod]
+                        [-0.03, +0.05],  // zone 0: lane 0-2   内・芝荒れ最大
+                        [-0.02, +0.03],  // zone 1: lane 2-4
+                        [-0.01, +0.01],  // zone 2: lane 4-6   わずかに荒れ
+                        [ 0.00,  0.00],  // zone 3: lane 6-8   基準
+                        [ 0.00,  0.00],  // zone 4: lane 8-10  基準
+                        [+0.01, -0.01],  // zone 5: lane 10-12 やや良
+                        [+0.01, -0.01],  // zone 6: lane 12-14 外・フレッシュ
+                        [+0.01, -0.01],  // zone 7: lane 14+   最外
+                    ];
+                    biasSpdMod = basicBias[zoneIdx][0];
+                    biasStaMod = basicBias[zoneIdx][1];
                 }
+
+                currentSpeed *= (1.0 + biasSpdMod);
+                staminaCost *= (1.0 + biasStaMod);
             }
 
             if (isCorner) {
