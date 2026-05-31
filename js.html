@@ -2812,17 +2812,16 @@
                 let cornerPower = currentCourseId === 'sonoda' ? 2.0 : 1.6;
                 currentSpeed *= Math.pow(R / actualR, cornerPower);
 
-                // インコース（lane < 3）：内を通ってスムーズに回るが馬場が荒れる
-                // 速度は保ちやすい（省エネ）、ただし加速しようとすると外に膨れる
+                // インコース（lane < 3）：スピードを落としてコーナーを回る → スタミナ節約
                 if (horse.lane < 3.0) {
                     let innerFactor = (3.0 - horse.lane) / 3.0; // 0〜1
-                    // 速度ロスは軽め（内を回る分距離が短いので）
-                    currentSpeed *= (1.0 - innerFactor * 0.012);
-                    // スタミナは若干消費（荒れた馬場）
-                    staminaCost *= 1.0 + innerFactor * 0.05;
+                    // スピードを落とす（コーナーリング）
+                    currentSpeed *= (1.0 - innerFactor * 0.045);
+                    // スタミナは節約できる（ゆっくり回る分）
+                    staminaCost *= Math.max(0.80, 1.0 - innerFactor * 0.18);
                 }
 
-                // アウトコース（lane > 8）：距離が長い分スピードを上げてカバー（スタミナ消費大）
+                // アウトコース（lane > 8）：スピードを上げて距離をカバー（スタミナ消費大）
                 if (horse.lane > 8.0) {
                     let outerFactor = (horse.lane - 8.0) / 10.0;
                     currentSpeed *= (1.0 + outerFactor * 0.022);
