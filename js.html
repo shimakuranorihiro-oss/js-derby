@@ -42,7 +42,7 @@
 
         <!-- コース切り替えタブ -->
         <div class="flex justify-center mb-4 space-x-4">
-            <button id="tabBasic" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
+            <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
         </div>
 
@@ -69,8 +69,8 @@
             </div>
         </div>
 
-        <!-- Gemini AI予想エリア -->
-        <div class="mb-4 bg-white rounded-xl shadow-md p-4 border-2 border-amber-300">
+        <!-- Gemini AI予想エリア（パドック診断：一旦非表示） -->
+        <div class="mb-4 bg-white rounded-xl shadow-md p-4 border-2 border-amber-300" style="display:none">
             <button id="aiPredictionBtn" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-black py-3 px-6 rounded-lg shadow-md transform transition hover:scale-[1.01] flex items-center justify-center">
                 ✨ ジェミニ予想長のパドック診断を聞く
             </button>
@@ -316,6 +316,23 @@
             if (r < probHigh) return 'high';
             if (r < probHigh + probMid) return 'middle';
             return 'slow';
+        }
+
+        // 距離別の基準タイム（秒）。園田の実測ベース：820m≒48.5秒, 1400m≒1分24秒, 1870m≒1分57秒
+        function parTime(dist) {
+            if (dist <= 1400) {
+                return 48.5 + (dist - 820) * (35.5 / 580); // 820→48.5 / 1400→84
+            }
+            return 84 + (dist - 1400) * (33 / 470);        // 1400→84 / 1870→117
+        }
+
+        // 秒数を「M:SS.s」または「SS.s」形式に整形
+        function formatRaceTime(sec) {
+            if (sec < 0) sec = 0;
+            let m = Math.floor(sec / 60);
+            let s = sec - m * 60;
+            if (m > 0) return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+            return s.toFixed(1);
         }
 
         // --- 馬のデータ（JRA基本コース用 200頭） ---
@@ -801,6 +818,8 @@
         let cameraShakeIntensity = 0;
         let frameCount = 0;
         let raceStartTime = 0;
+        let raceClock = 0;        // 表示用の走破タイム（基準タイムにキャリブレーション）
+        let lastFrontDist = 0;    // 前フレームの先頭通過距離
         let particles = [];
         let frameHistory = []; 
         let isCoolDown = false; 
@@ -1166,6 +1185,8 @@
             cameraY = 0;
             cinemaBarHeight = 0;
             frameCount = 0;
+            raceClock = 0;
+            lastFrontDist = 0;
             frameHistory = [];
             isCoolDown = false;
             activeSkillCutins = [];
@@ -2123,20 +2144,51 @@
                 const remain = Math.max(0, Math.floor(total_dist - leaderHorse.run_dist));
                 let surfaceText = currentSurface === 'turf' ? '芝' : 'ダート';
                 
-                let paceText = 'ミドル';
-                let paceColor = '#fbbf24'; 
-                if (currentPace === 'high') { paceText = 'ハイ'; paceColor = '#ef4444'; }
-                else if (currentPace === 'slow') { paceText = 'スロー'; paceColor = '#60a5fa'; }
-                else if (currentPace === 'dainige') { paceText = '大逃げ'; paceColor = '#d946ef'; }
-                
                 ctx.font = '14px sans-serif';
                 ctx.fillStyle = 'white';
                 ctx.fillText(`${surfaceText} ${total_dist}m  残り: ${remain}m`, 20, 30);
-                
-                ctx.font = 'bold 14px sans-serif';
-                ctx.fillStyle = paceColor;
-                ctx.fillText(paceText, 185, 30);
 
+                // 中央上部：ペース表示＋走破タイム
+                // ペースは一定距離を通過してから判明（1700m以上=600m、それ未満=400m）
+                {
+                    let paceRevealed = leaderHorse.run_dist >= (total_dist >= 1700 ? 600 : 400);
+                    let paceText = 'ミドルペース';
+                    let paceColor = '#fbbf24';
+                    if (currentPace === 'high') { paceText = 'ハイペース'; paceColor = '#ef4444'; }
+                    else if (currentPace === 'slow') { paceText = 'スローペース'; paceColor = '#60a5fa'; }
+                    else if (currentPace === 'dainige') { paceText = '大逃げ'; paceColor = '#d946ef'; }
+
+                    let timeStr = formatRaceTime(raceClock);
+
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'alphabetic';
+
+                    ctx.font = 'bold 20px sans-serif';
+                    let paceW = paceRevealed ? ctx.measureText(paceText).width + 32 : 0;
+                    ctx.font = 'bold 20px monospace';
+                    let timeW = ctx.measureText(timeStr).width + 28;
+                    let gap = paceRevealed ? 8 : 0;
+                    let totalW = paceW + gap + timeW;
+                    let startX = canvas.width / 2 - totalW / 2;
+
+                    if (paceRevealed) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(startX, 10, paceW, 34);
+                        ctx.fillStyle = paceColor;
+                        ctx.font = 'bold 20px sans-serif';
+                        ctx.fillText(paceText, startX + paceW / 2, 34);
+                    }
+                    let tx = startX + paceW + gap;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(tx, 10, timeW, 34);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 20px monospace';
+                    ctx.fillText(timeStr, tx + timeW / 2, 34);
+                    ctx.restore();
+                }
+
+                ctx.textAlign = 'left';
                 let h1 = currentRanking[0];
                 let h2 = currentRanking[1];
                 let h3 = currentRanking[2];
@@ -2312,7 +2364,13 @@
             let paceStaminaMod = 1.0;
             let paceSpeedMod = 1.0;
             if (remainToGoal > spurtDist) {
-                if (cPace === 'high') { paceSpeedMod = 1.04; paceStaminaMod = 1.06; } // ハイペース時スタミナ消費を抑制
+                if (cPace === 'high') {
+                    paceSpeedMod = 1.04;
+                    // ハイペース：前で速い流れを作る逃げ・先行は脚を使って垂れる／差し・追込は脚を温存できる
+                    if (horse.type === 'nige') paceStaminaMod = 1.42;
+                    else if (horse.type === 'senko') paceStaminaMod = 1.28;
+                    else paceStaminaMod = 1.04;
+                }
                 else if (cPace === 'slow') { paceSpeedMod = 0.96; paceStaminaMod = 0.85; }
                 else if (cPace === 'dainige') {
                     if (horse === currentLeader) {
@@ -2327,9 +2385,9 @@
                 currentSpeed *= paceSpeedMod;
                 staminaCost *= paceStaminaMod;
 
-                // 長距離ほど勝負どころまでスタミナを温存（道中は省エネで走る）
-                // 1800m以下：変化なし / 2400m：33%節約 / 3200m：53%節約
-                let distConserve = Math.min(1.0, Math.max(0.47, 1800 / total_dist));
+                // 距離別の道中スタミナ消費：短距離は脚を使い続けバテやすく、長距離は大きく温存
+                // 820m:×1.30 / 1230m:×1.30 / 1400m:×1.14 / 1600m:×1.0 / 2000m:×0.80 / 2400m:×0.67 / 3200m:×0.50
+                let distConserve = Math.min(1.30, Math.max(0.42, 1600 / total_dist));
                 staminaCost *= distConserve;
 
                 let isRearPushing = false;
@@ -2341,7 +2399,7 @@
 
                 if (cPace === 'high') {
                     let posFactor = Math.max(0, 30 - distToLeader) / 30;
-                    staminaCost *= (1.0 + 0.25 * posFactor); // ハイペース時スタミナ負荷軽減
+                    staminaCost *= (1.0 + 0.50 * posFactor); // ハイペース時、前方ほど脚を使い終盤に垂れる
                 }
 
                 if (horse.makuriTriggered && cPace === 'high') {
@@ -3578,6 +3636,28 @@
                 }
             });
 
+            // 走破タイムの積算：先頭の進んだ距離を、先頭馬の強さとペースで増減した実効速度に換算
+            // 強い馬が引っ張る／ハイペースなら時計が速くなり、弱い馬・スローなら遅くなる（先頭ゴールで停止）
+            if (finishedHorses.length === 0) {
+                let frontNow = 0;
+                horses.forEach(h => { if (h.run_dist > frontNow) frontNow = h.run_dist; });
+                frontNow = Math.min(frontNow, total_dist);
+                let dd = frontNow - lastFrontDist;
+                if (dd > 0) {
+                    let baseSpeed = total_dist / parTime(total_dist);
+                    // 先頭馬の地力（調子・適性込み）を基準値と比較。強いほど時計が速い
+                    const refStrength = 1.39;
+                    let strengthFactor = currentLeader.actualSpeedBase / refStrength;
+                    strengthFactor = Math.max(0.92, Math.min(1.08, strengthFactor));
+                    // ペース：ハイ/大逃げは速い決着、スローは遅い決着になりやすい
+                    let paceSpeedFactor = (currentPace === 'high' || currentPace === 'dainige') ? 1.02
+                                        : (currentPace === 'slow' ? 0.97 : 1.0);
+                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor;
+                    raceClock += dd / effSpeed;
+                }
+                lastFrontDist = frontNow;
+            }
+
             draw();
 
             if (!isCoolDown) {
@@ -4093,7 +4173,7 @@
         });
 
         // 起動時の初期化フロー
-        switchCourse('basic');
+        switchCourse('sonoda');
 
     </script>
 </body>
