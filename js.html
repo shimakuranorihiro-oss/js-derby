@@ -2312,7 +2312,7 @@
             let paceStaminaMod = 1.0;
             let paceSpeedMod = 1.0;
             if (remainToGoal > spurtDist) {
-                if (cPace === 'high') { paceSpeedMod = 1.04; paceStaminaMod = 1.15; } // ハイペース時の余分なスタミナ消費をさらに抑制
+                if (cPace === 'high') { paceSpeedMod = 1.04; paceStaminaMod = 1.06; } // ハイペース時スタミナ消費を抑制
                 else if (cPace === 'slow') { paceSpeedMod = 0.96; paceStaminaMod = 0.85; }
                 else if (cPace === 'dainige') {
                     if (horse === currentLeader) {
@@ -2328,8 +2328,8 @@
                 staminaCost *= paceStaminaMod;
 
                 // 長距離ほど勝負どころまでスタミナを温存（道中は省エネで走る）
-                // 1800m以下：変化なし / 2400m：25%節約 / 3200m：44%節約
-                let distConserve = Math.min(1.0, Math.max(0.55, 1800 / total_dist));
+                // 1800m以下：変化なし / 2400m：33%節約 / 3200m：53%節約
+                let distConserve = Math.min(1.0, Math.max(0.47, 1800 / total_dist));
                 staminaCost *= distConserve;
 
                 let isRearPushing = false;
@@ -2340,11 +2340,8 @@
                 });
 
                 if (cPace === 'high') {
-                    let posFactor = Math.max(0, 30 - distToLeader) / 30; 
+                    let posFactor = Math.max(0, 30 - distToLeader) / 30;
                     staminaCost *= (1.0 + 0.25 * posFactor); // ハイペース時スタミナ負荷軽減
-                } else if (cPace === 'slow') {
-                    let posFactor = Math.min(30, distToLeader) / 30; 
-                    staminaCost *= (1.0 + 0.20 * posFactor); // スローペース時スタミナ負荷軽減
                 }
 
                 if (horse.makuriTriggered && cPace === 'high') {
@@ -2389,23 +2386,8 @@
                     }
                     currentSpeed *= Math.min(maxCatchUp, Math.max(minCatchUp, catchUpFactor)); 
                     
-                    if (currentCourseId === 'basic') {
-                        if (horse.type === 'nige') {
-                            staminaCost *= isRearPushing ? 1.15 : 1.02; // スタミナ負荷マイルド化
-                        } else if (horse.type === 'senko') {
-                            staminaCost *= isRearPushing ? 1.10 : 1.01; 
-                        } else {
-                            staminaCost *= 0.95; 
-                        }
-                    } else {
-                        if (horse.makuriTriggered) {
-                            staminaCost *= 1.15; // 園田のまくり消費抑制
-                        } else if (horse.type === 'sashi' || horse.type === 'oikomi') {
-                            staminaCost *= 1.01;
-                        } else {
-                            staminaCost *= isRearPushing ? 1.20 : 1.03; 
-                        }
-                    }
+                    // 後方から追い上げ中：脚質による差のみ（ポジションペナルティなし）
+                    staminaCost *= 0.95; // 後方馬は道中省エネ
                 } else if (distToLeader < targetDistMin) {
                     let slowDown = (currentCourseId === 'sonoda' && horse.makuriTriggered) ? 0.90 : 0.95;
                     currentSpeed *= slowDown; 
@@ -2449,7 +2431,7 @@
                 let paceSpurtStaminaMod = 1.0;
                 let paceSpurtSpeedMod = 1.0;
                 if (cPace === 'high') {
-                    paceSpurtStaminaMod = 1.18; // ハイペース：スパートでもスタミナ消費が重い
+                    paceSpurtStaminaMod = 1.08; // ハイペース：スパートでのスタミナ消費
                     paceSpurtSpeedMod = 0.99;   // わずかに速度も落ちる
                 } else if (cPace === 'slow') {
                     paceSpurtStaminaMod = 0.88; // スローペース：温存した分スパートが軽い
@@ -2736,9 +2718,9 @@
                 }
                 
                 if (!foundPath) {
-                    currentSpeed = Math.min(currentSpeed, horse.actualSpeedBase * 0.85);
-                    horse.currentStamina -= 0.08 * speedMultiplier; // 詰まり時のスタミナペナルティ軽減
-                    horse.isStressed = true; 
+                    currentSpeed = Math.min(currentSpeed, horse.actualSpeedBase * 0.93);
+                    horse.currentStamina -= 0.03 * speedMultiplier; // 詰まり時のスタミナペナルティ軽減
+                    horse.isStressed = true;
                 }
             }
 
@@ -2754,7 +2736,7 @@
             }
 
             if (horse.isDrafting && !horse.isSweating) { staminaCost *= 0.5; currentSpeed *= 1.06; }
-            if (horse.isSandCovered) { staminaCost *= 1.15; horse.isStressed = true; }
+            if (horse.isSandCovered) { staminaCost *= 1.05; horse.isStressed = true; }
 
             if (remainToGoal > 400 && horse !== currentLeader) {
                 let currentDistToLeader = currentLeader.run_dist - horse.run_dist;
@@ -2972,8 +2954,8 @@
                     
                     acceleration = Math.min(targetAccel, maxAccelLimit);
 
-                    // 急加速ペナルティをマイルドに（400.0 -> 250.0、1.2 -> 1.1）
-                    let accelCost = (acceleration * 1.1) + (Math.pow(acceleration, 2) * 250.0); 
+                    // 急加速ペナルティをさらにマイルドに
+                    let accelCost = (acceleration * 0.7) + (Math.pow(acceleration, 2) * 150.0);
                     horse.currentStamina -= accelCost * speedMultiplier;
                 }
             } else {
