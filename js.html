@@ -333,8 +333,8 @@
             if (nigeCount === 0) contest -= 0.015;          // 誰も引っ張らない＝かなり緩い
             // 逃げ勢の地力が平均より上なら、さらに流れが速くなる
             const strengthBias = nigeCount ? (nigeAvg - fieldAvg) / Math.max(0.01, fieldAvg) : -0.01;
-            // 距離補正：短距離は前傾しやすく、長距離は落ち着きやすい
-            const distBias = dist <= 1400 ? 0.008 : (dist >= 1870 ? -0.015 : 0.0);
+            // 距離補正：短距離は前半から飛ばしてハイペースになりやすく（短いほど強い）、長距離は落ち着きやすい
+            const distBias = dist <= 1400 ? (0.024 + (1400 - dist) * 0.00003) : (dist >= 1870 ? -0.015 : 0.0);
             // 揺らぎ（同じ顔ぶれでも毎回同じ流れにはならない＝展開のアヤ）
             const noise = (Math.random() - 0.5) * 0.028;
 
