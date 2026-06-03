@@ -318,6 +318,30 @@
             return 'slow';
         }
 
+        // 出走馬の構成から「前半の流れの速さ」を創発させる（抽選ではない）。
+        // 逃げ馬が多い・強いほど先行争いで流れが速くなり、いなければ緩む。距離でも増減。
+        // 戻り値は前で運ぶ脚質に掛ける速度係数（概ね 0.95〜1.07）。1.0が標準的な流れ。
+        function computeEarlyPaceBoost(builtHorses, dist) {
+            if (!builtHorses || builtHorses.length === 0) return 1.0;
+            const nige  = builtHorses.filter(h => h.type === 'nige');
+            const fieldAvg = builtHorses.reduce((s, h) => s + h.actualSpeedBase, 0) / builtHorses.length;
+            const nigeCount = nige.length;
+            const nigeAvg = nigeCount ? nige.reduce((s, h) => s + h.actualSpeedBase, 0) / nigeCount : 0;
+
+            // 先行争いの激しさ：逃げ3頭あたりを標準とし、多いほど速い／少ない＆いないほど緩い
+            let contest = (nigeCount - 3) * 0.010;
+            if (nigeCount === 0) contest -= 0.015;          // 誰も引っ張らない＝かなり緩い
+            // 逃げ勢の地力が平均より上なら、さらに流れが速くなる
+            const strengthBias = nigeCount ? (nigeAvg - fieldAvg) / Math.max(0.01, fieldAvg) : -0.01;
+            // 距離補正：短距離は前傾しやすく、長距離は落ち着きやすい
+            const distBias = dist <= 1400 ? 0.008 : (dist >= 1870 ? -0.015 : 0.0);
+            // 揺らぎ（同じ顔ぶれでも毎回同じ流れにはならない＝展開のアヤ）
+            const noise = (Math.random() - 0.5) * 0.028;
+
+            let boost = 1.0 + contest + strengthBias * 0.6 + distBias + noise;
+            return Math.max(0.95, Math.min(1.07, boost));
+        }
+
         // 距離別の基準タイム（秒）。園田の実測ベース：820m≒48.5秒, 1400m≒1分24秒, 1870m≒1分57秒
         function parTime(dist) {
             if (dist <= 1400) {
@@ -820,6 +844,15 @@
         let raceStartTime = 0;
         let raceClock = 0;        // 表示用の走破タイム（基準タイムにキャリブレーション）
         let lastFrontDist = 0;    // 前フレームの先頭通過距離
+        // ペース創発：抽選せず、出走馬構成で生まれた前半の流れ→実走の通過タイムでハイ/ミドル/スローを確定
+        let paceDecided = false;       // 通過タイムでペースが確定したか
+        let measuredPaceIndex = 1.0;   // 判定地点で実測したペース指標（1.0標準・>速い）→走破タイムにも反映
+        let paceSplitDist = 400;       // ペース判定地点（短距離400m / 長距離600m）
+        let earlyPaceBoost = 1.0;      // 出走馬構成から生まれる前半の流れの速さ（先行争い／緩い流れ）
+        let paceVelSum = 0;            // 先頭の実速×進んだ距離 の積算（距離加重平均用）
+        let paceBaseSum = 0;           // 先頭の地力×進んだ距離 の積算
+        let paceDistAcc = 0;           // 判定区間で積算した距離
+        let lastLeaderSplitDist = 0;   // 前フレームの先頭距離（判定区間用）
         let particles = [];
         let frameHistory = []; 
         let isCoolDown = false; 
@@ -1105,7 +1138,12 @@
         });
 
         function resetHorses() {
-            currentPace = determinePace(currentHorses, total_dist);
+            // ペースは抽選しない。判定地点(短距離400m/長距離600m)を通過するまでは中立。
+            currentPace = 'middle';
+            paceDecided = false;
+            measuredPaceIndex = 1.0;
+            paceSplitDist = total_dist >= 1700 ? 600 : 400;
+            paceVelSum = 0; paceBaseSum = 0; paceDistAcc = 0; lastLeaderSplitDist = 0;
             paceAnnounced = false;
             makuriAnnounced = false;
             ikkiAnnounced = false;
@@ -1179,6 +1217,9 @@
             leaderHorse = horses[0];
             finishedHorses = [];
             currentRanking = [...horses];
+
+            // 出走馬の顔ぶれ（逃げ馬の数・地力）から前半の流れを創発させる
+            earlyPaceBoost = computeEarlyPaceBoost(horses, total_dist);
             
             cameraScale = 1.0; 
             cameraX = 0; 
@@ -2149,9 +2190,9 @@
                 ctx.fillText(`${surfaceText} ${total_dist}m  残り: ${remain}m`, 20, 30);
 
                 // 中央上部：ペース表示＋走破タイム
-                // ペースは一定距離を通過してから判明（1700m以上=600m、それ未満=400m）
+                // ペースは判定地点（1700m以上=600m、それ未満=400m）の通過タイムで確定してから表示
                 {
-                    let paceRevealed = leaderHorse.run_dist >= (total_dist >= 1700 ? 600 : 400);
+                    let paceRevealed = paceDecided;
                     let paceText = 'ミドルペース';
                     let paceColor = '#fbbf24';
                     if (currentPace === 'high') { paceText = 'ハイペース'; paceColor = '#ef4444'; }
@@ -2384,6 +2425,18 @@
             if (remainToGoal > spurtDist) {
                 currentSpeed *= paceSpeedMod;
                 staminaCost *= paceStaminaMod;
+
+                // ペース確定前（実走）：出走馬構成から生まれた前半の流れを前で運ぶ脚質に反映。
+                // 速い流れを作る逃げ・先行ほど脚を使う＝終盤の前崩れの素地になる。
+                if (!isSim && !paceDecided) {
+                    let roleW = horse.type === 'nige' ? 1.0
+                              : horse.type === 'senko' ? 0.6
+                              : horse.type === 'sashi' ? 0.15 : 0.0;
+                    let appliedBoost = 1.0 + (earlyPaceBoost - 1.0) * roleW;
+                    currentSpeed *= appliedBoost;
+                    if (appliedBoost > 1.0)      staminaCost *= 1.0 + (appliedBoost - 1.0) * 8.0; // 速い流れは消耗大
+                    else if (appliedBoost < 1.0) staminaCost *= 1.0 + (appliedBoost - 1.0) * 3.0; // 緩い流れは温存
+                }
 
                 // 距離別の道中スタミナ消費：短距離は脚を使い続けバテやすく、長距離は大きく温存
                 // 820m:×1.30 / 1230m:×1.30 / 1400m:×1.14 / 1600m:×1.0 / 2000m:×0.80 / 2400m:×0.67 / 3200m:×0.50
@@ -3636,6 +3689,40 @@
                 }
             });
 
+            // ペース確定：先頭が判定地点(短距離400m/長距離600m)を通過するまでの「実走の速さ」を計測し、
+            // その速い／遅いでハイ・ミドル・スローを決める（抽選ではなく走った結果で決まる）。
+            // 指標 = 先頭の実速 / 先頭の地力（距離加重平均）。地力や見た目の演出速度に依らずペースだけを取り出す。
+            if (!paceDecided && isRacing && finishedHorses.length === 0) {
+                let frontNow2 = 0, frontHorse = null;
+                horses.forEach(h => { if (h.run_dist > frontNow2) { frontNow2 = h.run_dist; frontHorse = h; } });
+                let dd2 = frontNow2 - lastLeaderSplitDist;
+                if (dd2 > 0 && frontHorse && frontHorse.currentVelocity > 0) {
+                    paceVelSum  += frontHorse.currentVelocity * dd2;
+                    paceBaseSum += frontHorse.actualSpeedBase * dd2;
+                    paceDistAcc += dd2;
+                }
+                lastLeaderSplitDist = frontNow2;
+
+                if (frontNow2 >= paceSplitDist && paceBaseSum > 0) {
+                    const paceIndex = paceVelSum / paceBaseSum; // 1.0で標準、>速い／<遅い
+                    measuredPaceIndex = paceIndex; // 走破タイムにも反映（速い流れ＝速い時計）
+                    const HIGH_TH = 1.018;
+                    const SLOW_TH = 0.965;
+                    if (paceIndex >= HIGH_TH) currentPace = 'high';
+                    else if (paceIndex <= SLOW_TH) currentPace = 'slow';
+                    else currentPace = 'middle';
+
+                    // 大逃げ：単騎の逃げ馬が後続を大きく離して速い流れを作っているとき
+                    if (currentPace === 'high' && frontHorse && frontHorse.type === 'nige') {
+                        let second = currentRanking.find(h => h !== frontHorse);
+                        let gap = second ? (frontHorse.run_dist - second.run_dist) : 0;
+                        let otherNige = horses.some(h => h !== frontHorse && h.type === 'nige' && (frontHorse.run_dist - h.run_dist) < 12);
+                        if (gap > 18 && !otherNige) currentPace = 'dainige';
+                    }
+                    paceDecided = true;
+                }
+            }
+
             // 走破タイムの積算：先頭の進んだ距離を、先頭馬の強さとペースで増減した実効速度に換算
             // 強い馬が引っ張る／ハイペースなら時計が速くなり、弱い馬・スローなら遅くなる（先頭ゴールで停止）
             if (finishedHorses.length === 0) {
@@ -3645,13 +3732,14 @@
                 let dd = frontNow - lastFrontDist;
                 if (dd > 0) {
                     let baseSpeed = total_dist / parTime(total_dist);
-                    // 先頭馬の地力（調子・適性込み）を基準値と比較。強いほど時計が速い
-                    const refStrength = 1.39;
+                    // 先頭馬の地力（調子・適性込み）を基準値と比較。強いほど時計が速い。
+                    // refStrengthは「標準的な勝ち馬の地力」に合わせて校正（中庸ペースで基準タイムに収束させる）。
+                    const refStrength = 1.35;
                     let strengthFactor = currentLeader.actualSpeedBase / refStrength;
-                    strengthFactor = Math.max(0.92, Math.min(1.08, strengthFactor));
-                    // ペース：ハイ/大逃げは速い決着、スローは遅い決着になりやすい
-                    let paceSpeedFactor = (currentPace === 'high' || currentPace === 'dainige') ? 1.02
-                                        : (currentPace === 'slow' ? 0.97 : 1.0);
+                    strengthFactor = Math.max(0.94, Math.min(1.06, strengthFactor));
+                    // ペース：実測したペース指標（先頭が前半どれだけ速く流れたか）をそのまま時計に反映。
+                    // 速い流れ＝速い時計、緩い流れ＝遅い時計。極端な値はクランプして暴れを抑える。
+                    let paceSpeedFactor = Math.max(0.96, Math.min(1.05, measuredPaceIndex));
                     let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor;
                     raceClock += dd / effSpeed;
                 }
