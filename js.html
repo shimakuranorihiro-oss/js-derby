@@ -82,7 +82,7 @@
             <canvas id="raceCanvas" width="1000" height="500"></canvas>
             
             <!-- カメラ視点の切り替えボタン -->
-            <button id="cameraToggleBtn" class="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white font-bold px-4 py-2 rounded-full text-sm backdrop-blur-sm border border-gray-500 transition-colors z-10 flex items-center shadow-lg">
+            <button id="cameraToggleBtn" class="absolute bottom-4 right-4 bg-black/60 hover:bg-black/80 text-white font-bold px-4 py-2 rounded-full text-sm backdrop-blur-sm border border-gray-500 transition-colors z-10 flex items-center shadow-lg">
                 <span class="mr-1">🎥</span> 視点: 全体
             </button>
             
@@ -2185,9 +2185,9 @@
                 activeSkillCutins = activeSkillCutins.filter(c => c.time > 0);
             }
 
-            if (isRacing && leaderHorse) {
+            if ((isRacing || isCoolDown) && leaderHorse) {
                 ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                ctx.fillRect(10, 10, 240, 140); 
+                ctx.fillRect(10, 10, 240, 140);
                 
                 ctx.textAlign = 'left';
                 const remain = Math.max(0, Math.floor(total_dist - leaderHorse.run_dist));
