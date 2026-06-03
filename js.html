@@ -342,13 +342,13 @@
             return Math.max(0.95, Math.min(1.07, boost));
         }
 
-        // 距離別の基準タイム（秒）。実測の平均勝ちタイムに合わせる（中庸ペースでこのタイムに収束）。
-        // 園田(ダート): 820≒52 / 1230≒77 / 1400≒88 / 1700≒107 / 1870≒118 / 2400≒155
+        // 距離別の基準タイム（秒）。中庸ペース・標準的な勝ち馬でこのタイムに収束する。
+        // 園田(ダート): 820≒50 / 1230≒74 / 1400≒85 / 1700≒103 / 1870≒114（1400mを1:25.0基準に再校正）
         // JRA基本     : 1200≒69 / 1600≒94 / 2000≒119 / 2400≒144 / 3200≒195
         function parTime(dist) {
             if (currentCourseId === 'sonoda') {
-                if (dist <= 1400) return 52 + (dist - 820) * (36 / 580); // 820→52 / 1400→88
-                return 88 + (dist - 1400) * (30 / 470);                  // 1400→88 / 1870→118
+                if (dist <= 1400) return 50 + (dist - 820) * (35 / 580); // 820→50 / 1400→85
+                return 85 + (dist - 1400) * (29 / 470);                  // 1400→85 / 1870→114
             }
             return 69 + (dist - 1200) * 0.0625;                          // 1200→69 / 1600→94 / 2000→119
         }
@@ -860,6 +860,7 @@
         let lapList = [];              // {mark:通過距離, lap:区間タイム, cum:累計タイム}
         let lapNextMark = 200;         // 次に記録する通過距離
         let lapPrevClock = 0;          // 前回ラップ記録時のraceClock
+        let paceWavePhase = 0;         // 道中の緩急（波）の位相。レースごとにランダムで起伏の出方を変える
         let particles = [];
         let frameHistory = []; 
         let isCoolDown = false; 
@@ -1152,6 +1153,7 @@
             paceSplitDist = total_dist >= 1700 ? 600 : 400;
             paceVelSum = 0; paceBaseSum = 0; paceDistAcc = 0; lastLeaderSplitDist = 0;
             lapList = []; lapNextMark = 200; lapPrevClock = 0;
+            paceWavePhase = Math.random(); // 道中の緩急の波の位相をレースごとにずらす
             paceAnnounced = false;
             makuriAnnounced = false;
             ikkiAnnounced = false;
@@ -3805,8 +3807,23 @@
                     let paceSpeedFactor = Math.max(0.96, Math.min(1.05, measuredPaceIndex));
                     // 発走直後は加速途上で時計が遅い（最初の1ハロンが最も遅い）。CLOCK_CALで全体を基準タイムに再校正。
                     let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
-                    const CLOCK_CAL = 1.013;
-                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor * dashClockFactor * CLOCK_CAL;
+                    const CLOCK_CAL = 1.0195;
+                    // 道中の速度配分（脚質・ペース連動のラップ・プロファイル）。先頭の進捗 p(0→1) で形を変える。
+                    // 各形状は区間平均≒1.0に正規化してあるので総タイム(=1:25基準)は変えず、ラップにだけ起伏を作る。
+                    // ハイ/大逃げ＝前傾(テン速い→上がり失速)、スロー＝瞬発戦(道中緩い→上がり最速)、ミドル＝緩やかな前傾。
+                    let p = total_dist > 0 ? Math.min(1, frontNow / total_dist) : 0;
+                    let paceShape;
+                    if (currentPace === 'high' || currentPace === 'dainige') {
+                        paceShape = 1 + 0.16 * (1/3 - p * p);   // 前傾：序盤速く終盤フェード
+                    } else if (currentPace === 'slow') {
+                        paceShape = 1 + 0.16 * (p * p - 1/3);   // 後傾：道中緩く上がりで加速（ヨーイドン）
+                    } else {
+                        paceShape = 1 + 0.07 * (0.5 - p);       // ミドル：緩やかな前傾
+                    }
+                    // 道中の細かな緩急（2周期の波）。位相はレースごとに変わる。区間積分≒0でタイムは不変。
+                    let paceWave = 0.025 * Math.sin(2 * Math.PI * (2 * p + paceWavePhase));
+                    let paceProfile = paceShape + paceWave;
+                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor * dashClockFactor * CLOCK_CAL * paceProfile;
                     raceClock += dd / effSpeed;
                 }
                 lastFrontDist = frontNow;
