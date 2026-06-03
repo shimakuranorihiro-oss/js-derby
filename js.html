@@ -853,6 +853,10 @@
         let paceBaseSum = 0;           // 先頭の地力×進んだ距離 の積算
         let paceDistAcc = 0;           // 判定区間で積算した距離
         let lastLeaderSplitDist = 0;   // 前フレームの先頭距離（判定区間用）
+        // 200mごとのラップ計測（先頭が各200m地点を通過した時のタイムから区間タイムを刻む）
+        let lapList = [];              // {mark:通過距離, lap:区間タイム, cum:累計タイム}
+        let lapNextMark = 200;         // 次に記録する通過距離
+        let lapPrevClock = 0;          // 前回ラップ記録時のraceClock
         let particles = [];
         let frameHistory = []; 
         let isCoolDown = false; 
@@ -1144,6 +1148,7 @@
             measuredPaceIndex = 1.0;
             paceSplitDist = total_dist >= 1700 ? 600 : 400;
             paceVelSum = 0; paceBaseSum = 0; paceDistAcc = 0; lastLeaderSplitDist = 0;
+            lapList = []; lapNextMark = 200; lapPrevClock = 0;
             paceAnnounced = false;
             makuriAnnounced = false;
             ikkiAnnounced = false;
@@ -1191,11 +1196,11 @@
                     run_dist: 0, 
                     lane: index, 
                     currentStamina: actualStamina,
-                    actualSpeedBase: initialSpeed, 
-                    currentVelocity: initialSpeed, 
+                    actualSpeedBase: initialSpeed,
+                    currentVelocity: initialSpeed * 0.18, // スタートは低速（ほぼ静止）から加速していく
                     isSweating: false,
-                    isDrafting: false, 
-                    isSandCovered: false, 
+                    isDrafting: false,
+                    isSandCovered: false,
                     isStressed: false, 
                     blocked: false,
                     isBattling: false, 
@@ -2189,7 +2194,7 @@
                 ctx.fillStyle = 'white';
                 ctx.fillText(`${surfaceText} ${total_dist}m  残り: ${remain}m`, 20, 30);
 
-                // 中央上部：ペース表示＋走破タイム
+                // 上部：走破タイムを左寄せで表示し、その右に200mごとのラップを刻む
                 // ペースは判定地点（1700m以上=600m、それ未満=400m）の通過タイムで確定してから表示
                 {
                     let paceRevealed = paceDecided;
@@ -2202,30 +2207,51 @@
                     let timeStr = formatRaceTime(raceClock);
 
                     ctx.save();
-                    ctx.textAlign = 'center';
                     ctx.textBaseline = 'alphabetic';
+                    const barY = 10;
+                    let x = 270; // 左の情報ボックスの右側に左寄せ
 
-                    ctx.font = 'bold 20px sans-serif';
-                    let paceW = paceRevealed ? ctx.measureText(paceText).width + 32 : 0;
-                    ctx.font = 'bold 20px monospace';
-                    let timeW = ctx.measureText(timeStr).width + 28;
-                    let gap = paceRevealed ? 8 : 0;
-                    let totalW = paceW + gap + timeW;
-                    let startX = canvas.width / 2 - totalW / 2;
-
+                    // ペースラベル
                     if (paceRevealed) {
-                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                        ctx.fillRect(startX, 10, paceW, 34);
-                        ctx.fillStyle = paceColor;
                         ctx.font = 'bold 20px sans-serif';
-                        ctx.fillText(paceText, startX + paceW / 2, 34);
+                        let paceW = ctx.measureText(paceText).width + 24;
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(x, barY, paceW, 34);
+                        ctx.textAlign = 'center';
+                        ctx.fillStyle = paceColor;
+                        ctx.fillText(paceText, x + paceW / 2, barY + 24);
+                        x += paceW + 8;
                     }
-                    let tx = startX + paceW + gap;
-                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                    ctx.fillRect(tx, 10, timeW, 34);
-                    ctx.fillStyle = '#ffffff';
+
+                    // 走破タイム
                     ctx.font = 'bold 20px monospace';
-                    ctx.fillText(timeStr, tx + timeW / 2, 34);
+                    let timeW = ctx.measureText(timeStr).width + 24;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(x, barY, timeW, 34);
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(timeStr, x + timeW / 2, barY + 24);
+                    x += timeW + 10;
+
+                    // 200mごとのラップ（直近を右へ並べる。最速ラップを強調）
+                    if (lapList.length > 0) {
+                        const cellW = 56;
+                        let maxCells = Math.max(1, Math.floor((canvas.width - 12 - x) / cellW));
+                        let shown = lapList.slice(-maxCells);
+                        let fastest = Math.min(...lapList.map(l => l.lap));
+                        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                        ctx.fillRect(x, barY, shown.length * cellW + 8, 34);
+                        ctx.textAlign = 'left';
+                        shown.forEach((lp, i) => {
+                            let cx0 = x + 6 + i * cellW;
+                            ctx.fillStyle = '#9ca3af';
+                            ctx.font = '9px monospace';
+                            ctx.fillText(`${lp.mark}m`, cx0, barY + 12);
+                            ctx.font = 'bold 14px monospace';
+                            ctx.fillStyle = (lp.lap === fastest) ? '#34d399' : '#fde047';
+                            ctx.fillText(lp.lap.toFixed(1), cx0, barY + 29);
+                        });
+                    }
                     ctx.restore();
                 }
 
@@ -3034,10 +3060,14 @@
                     if (horse.accelType === 'sharp') baseAccel = 0.025; 
                     else if (horse.accelType === 'smooth') baseAccel = 0.008; 
                     
-                    let accelRatio = baseAccel; 
-                    
-                    if (total_dist <= 1600) accelRatio *= 1.5; 
-                    if (horse.skillTimer > 0) accelRatio *= 1.8; 
+                    let accelRatio = baseAccel;
+
+                    if (total_dist <= 1600) accelRatio *= 1.5;
+                    if (horse.skillTimer > 0) accelRatio *= 1.8;
+
+                    // スタートダッシュ：ゲート直後は低速からひと息に巡航速度まで加速する
+                    let inStartDash = horse.run_dist < 130 && horse.currentVelocity < horse.actualSpeedBase * 0.97;
+                    if (inStartDash) accelRatio *= 4.0;
 
                     if (horse.currentStamina < 20) {
                         accelRatio = 0.005 + (accelRatio - 0.005) * (horse.currentStamina / 20);
@@ -3060,13 +3090,15 @@
                     }
 
                     let maxAccelLimit = (horse.accelType === 'sharp') ? 0.008 : 0.004;
-                    if (horse.makuriTriggered && currentCourseId === 'sonoda') maxAccelLimit = 0.0015; 
+                    if (horse.makuriTriggered && currentCourseId === 'sonoda') maxAccelLimit = 0.0015;
                     if (horse.skillTimer > 0) maxAccelLimit *= 1.5;
-                    
+                    if (inStartDash) maxAccelLimit = Math.max(maxAccelLimit, 0.045); // 発走直後だけ大きく加速できる
+
                     acceleration = Math.min(targetAccel, maxAccelLimit);
 
                     // 急加速ペナルティをさらにマイルドに
                     let accelCost = (acceleration * 0.7) + (Math.pow(acceleration, 2) * 150.0);
+                    if (inStartDash) accelCost = 0; // ゲートダッシュはスタミナを消費しない
                     horse.currentStamina -= accelCost * speedMultiplier;
                 }
             } else {
@@ -3520,16 +3552,38 @@
                 isRacing = true;
                 raceStartTime = Date.now();
 
-                let badStartHorses = horses.filter(h => h.startDelay >= 10);
-                if (badStartHorses.length > 0) {
-                    let worst = badStartHorses.reduce((prev, current) => (prev.startDelay > current.startDelay) ? prev : current);
-                    commentary.innerText = `スタートしました！ おっと、${worst.name}が少し出遅れたか！？`;
+                let surfaceText = currentSurface === 'turf' ? '芝' : 'ダート';
+                let courseName = COURSES[currentCourseId].name;
+
+                // スタートの巧拙：好発進した馬と出遅れた馬を判定
+                let byDelay = [...horses].sort((a, b) => a.startDelay - b.startDelay);
+                let goodStarters = byDelay.filter(h => h.startDelay < 1.2);
+                let lateStarters = horses.filter(h => h.startDelay >= 10).sort((a, b) => b.startDelay - a.startDelay);
+
+                // まずは好スタートを伝える
+                if (goodStarters.length > 0) {
+                    commentary.innerText = `各馬一斉にスタート！ ${goodStarters[0].name} が好発進だ！ ${courseName} ${surfaceText}${total_dist}m、号砲が鳴った！`;
                 } else {
-                    let surfaceText = currentSurface === 'turf' ? '芝' : 'ダート';
-                    let courseName = COURSES[currentCourseId].name;
-                    commentary.innerText = `各馬、綺麗なスタートを切りました！ ${courseName} ${surfaceText}${total_dist}mの戦いです。`;
+                    commentary.innerText = `各馬一斉にスタート！ ${courseName} ${surfaceText}${total_dist}mの戦いが始まった！`;
                 }
-                
+                // updateCommentaryの汎用スタート文での上書きを防ぎ、次の実況まで少し間を取る
+                announcedPhases['start'] = true;
+                lastCommentaryTime = Date.now();
+
+                // 出遅れた馬はワンテンポ遅れて伝える
+                if (lateStarters.length > 0) {
+                    let w = lateStarters[0];
+                    let lateMsg = lateStarters.length >= 2
+                        ? `おっと！ ${w.name} をはじめ${lateStarters.length}頭が出遅れた！ 痛い立ち遅れだ！`
+                        : `おっと！ ${w.name} が出遅れた！ ここから巻き返せるか！？`;
+                    setTimeout(() => {
+                        if (isRacing && finishedHorses.length === 0) {
+                            commentary.innerText = lateMsg;
+                            lastCommentaryTime = Date.now();
+                        }
+                    }, 1500);
+                }
+
                 raceLoop();
             }, 3000);
         }
@@ -3655,7 +3709,11 @@
                             ];
                             commentary.innerText = lines[Math.floor(Math.random() * lines.length)];
                         } else {
-                            const lines = [
+                            const lines = (currentCourseId === 'sonoda') ? [
+                                `ゴールイン！ 園田を制したのは ${horse.name}だァ！ 見事な走りっぷりッ！`,
+                                `${horse.name}！！ 園田の砂を蹴って先頭でゴール板を駆け抜けたァ！`,
+                                `勝ったのは ${horse.name}！！ ${horse.skillName} で園田を勝ち切ったッ！`,
+                            ] : [
                                 `1着でゴール板を駆け抜けたのは ${horse.name}！！`,
                                 `${horse.name}！！ ${horse.skillName} でゴールを制した！！`,
                                 `勝ったのは ${horse.name}！！ 見事な走りでした！！`,
@@ -3696,7 +3754,8 @@
                 let frontNow2 = 0, frontHorse = null;
                 horses.forEach(h => { if (h.run_dist > frontNow2) { frontNow2 = h.run_dist; frontHorse = h; } });
                 let dd2 = frontNow2 - lastLeaderSplitDist;
-                if (dd2 > 0 && frontHorse && frontHorse.currentVelocity > 0) {
+                // スタートダッシュ区間(～140m)は加速中で速度が低いので計測から除外し、巡航に乗ってからの流れだけを測る
+                if (dd2 > 0 && frontNow2 > 140 && lastLeaderSplitDist >= 140 && frontHorse && frontHorse.currentVelocity > 0) {
                     paceVelSum  += frontHorse.currentVelocity * dd2;
                     paceBaseSum += frontHorse.actualSpeedBase * dd2;
                     paceDistAcc += dd2;
@@ -3725,10 +3784,11 @@
 
             // 走破タイムの積算：先頭の進んだ距離を、先頭馬の強さとペースで増減した実効速度に換算
             // 強い馬が引っ張る／ハイペースなら時計が速くなり、弱い馬・スローなら遅くなる（先頭ゴールで停止）
-            if (finishedHorses.length === 0) {
+            {
                 let frontNow = 0;
                 horses.forEach(h => { if (h.run_dist > frontNow) frontNow = h.run_dist; });
                 frontNow = Math.min(frontNow, total_dist);
+                if (finishedHorses.length === 0) {
                 let dd = frontNow - lastFrontDist;
                 if (dd > 0) {
                     let baseSpeed = total_dist / parTime(total_dist);
@@ -3740,10 +3800,21 @@
                     // ペース：実測したペース指標（先頭が前半どれだけ速く流れたか）をそのまま時計に反映。
                     // 速い流れ＝速い時計、緩い流れ＝遅い時計。極端な値はクランプして暴れを抑える。
                     let paceSpeedFactor = Math.max(0.96, Math.min(1.05, measuredPaceIndex));
-                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor;
+                    // 発走直後は加速途上で時計が遅い（最初の1ハロンが最も遅い）。CLOCK_CALで全体を基準タイムに再校正。
+                    let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
+                    const CLOCK_CAL = 1.013;
+                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor * dashClockFactor * CLOCK_CAL;
                     raceClock += dd / effSpeed;
                 }
                 lastFrontDist = frontNow;
+                }
+
+                // 200mごとのラップを刻む（完走時の最終区間も確定。先頭が各通過地点を超えた時点で区間タイムを確定）
+                while (lapNextMark <= total_dist && frontNow >= lapNextMark) {
+                    lapList.push({ mark: lapNextMark, lap: raceClock - lapPrevClock, cum: raceClock });
+                    lapPrevClock = raceClock;
+                    lapNextMark += 200;
+                }
             }
 
             draw();
@@ -3787,6 +3858,17 @@
             
             let makuriHorse = currentRanking.find(h => h.makuriTriggered && !announcedPhases['makuri_' + h.name]);
             let ikkiHorse = currentRanking.find(h => h.isChokusenIkki && (total_dist - h.run_dist) < 400 && h.currentVelocity > leaderHorse.currentVelocity + 0.5 && !announcedPhases['ikki_' + h.name]);
+
+            // 最終コーナー前以降は「勝ち負けに関係する馬」だけを実況対象にする
+            const isFinalPhase = remain <= 650;
+            const leadDist = top1 ? top1.run_dist : 0;
+            const contenders = currentRanking.filter((h, idx) =>
+                idx < 5 ||
+                (leadDist - h.run_dist) <= 18 ||
+                (top1 && h.currentVelocity > top1.currentVelocity + 0.3)
+            );
+            const isContender = (h) => !!h && contenders.includes(h);
+            const isSonoda = currentCourseId === 'sonoda';
 
             if (remain <= total_dist && remain > total_dist - 100 && !announcedPhases['start']) {
                 announcedPhases['start'] = true;
@@ -3870,8 +3952,16 @@
                 }
                 else if (makuriHorse && remain > 400 && remain <= 800) {
                     announcedPhases['makuri_' + makuriHorse.name] = true;
-                    if (currentCourseId === 'sonoda') text = `向正面！後方から ${makuriHorse.name} が動いた！園田名物のまくりだ！`;
-                    else text = `おおっと！外から ${makuriHorse.name} が一気にポジションを上げていく！`;
+                    if (isSonoda) {
+                        const sonodaMakuri = [
+                            `さあ動いた動いたッ！ ${makuriHorse.name}、外を回して園田名物の大まくりだァ！`,
+                            `向正面で火が点いた！ ${makuriHorse.name}！ これぞ園田、後方一気のまくりが炸裂！`,
+                            `おおっとォ！ ${makuriHorse.name} がまくって上がっていくゥ！ 園田のセオリー、勝負はここからだッ！`,
+                        ];
+                        text = sonodaMakuri[Math.floor(Math.random() * sonodaMakuri.length)];
+                    } else {
+                        text = `おおっと！外から ${makuriHorse.name} が一気にポジションを上げていく！`;
+                    }
                     type = "event";
                 }
                 else if (ikkiHorse && remain <= 400 && remain > 100) {
@@ -3881,9 +3971,9 @@
                 }
             }
 
-            // バテ馬への言及
+            // バテ馬への言及（終盤は勝ち負けに絡む馬のバテだけを伝える）
             if (!text) {
-                let sweatHorse = currentRanking.find(h => h.isSweating && !announcedPhases['sweat_' + h.name] && remain < 400);
+                let sweatHorse = currentRanking.find(h => h.isSweating && !announcedPhases['sweat_' + h.name] && remain < 400 && (!isFinalPhase || isContender(h)));
                 if (sweatHorse) {
                     announcedPhases['sweat_' + sweatHorse.name] = true;
                     const sweatLines = [
@@ -3949,7 +4039,7 @@
                         ];
                         text = chaserLines[Math.floor(Math.random() * chaserLines.length)];
                         type = "chaser_push";
-                    } else if (favoriteHorse && !favoriteHorse.isGoal && currentRanking.indexOf(favoriteHorse) > 2 && lastCommentaryType !== "favorite") {
+                    } else if (favoriteHorse && !favoriteHorse.isGoal && currentRanking.indexOf(favoriteHorse) > 2 && (!isFinalPhase || isContender(favoriteHorse)) && lastCommentaryType !== "favorite") {
                         let favRank = currentRanking.indexOf(favoriteHorse) + 1;
                         const favLines = [
                             `1番人気の ${favoriteHorse.name} は現在${favRank}番手！ ここから届くのか！？`,
@@ -3970,7 +4060,9 @@
                     const gap12 = top2 ? top1.run_dist - top2.run_dist : 99;
                     if (r < 0.30 && top2 && lastCommentaryType !== "stretch_battle") {
                         if (gap12 < 3) {
-                            text = `${top1.name} と ${top2.name} の叩き合い！ 全く離れない！！`;
+                            text = isSonoda
+                                ? `園田の直線、${top1.name} と ${top2.name} が一歩も譲らないッ！ これが園田、意地と意地のぶつかり合いだァ！`
+                                : `${top1.name} と ${top2.name} の叩き合い！ 全く離れない！！`;
                         } else {
                             text = `${top1.name} が粘る！ ${top2.name} が迫る！ 激しい争い！`;
                         }
