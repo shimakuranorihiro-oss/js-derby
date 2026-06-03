@@ -342,12 +342,15 @@
             return Math.max(0.95, Math.min(1.07, boost));
         }
 
-        // 距離別の基準タイム（秒）。園田の実測ベース：820m≒48.5秒, 1400m≒1分24秒, 1870m≒1分57秒
+        // 距離別の基準タイム（秒）。実測の平均勝ちタイムに合わせる（中庸ペースでこのタイムに収束）。
+        // 園田(ダート): 820≒52 / 1230≒77 / 1400≒88 / 1700≒107 / 1870≒118 / 2400≒155
+        // JRA基本     : 1200≒69 / 1600≒94 / 2000≒119 / 2400≒144 / 3200≒195
         function parTime(dist) {
-            if (dist <= 1400) {
-                return 48.5 + (dist - 820) * (35.5 / 580); // 820→48.5 / 1400→84
+            if (currentCourseId === 'sonoda') {
+                if (dist <= 1400) return 52 + (dist - 820) * (36 / 580); // 820→52 / 1400→88
+                return 88 + (dist - 1400) * (30 / 470);                  // 1400→88 / 1870→118
             }
-            return 84 + (dist - 1400) * (33 / 470);        // 1400→84 / 1870→117
+            return 69 + (dist - 1200) * 0.0625;                          // 1200→69 / 1600→94 / 2000→119
         }
 
         // 秒数を「M:SS.s」または「SS.s」形式に整形
@@ -4266,28 +4269,10 @@
                 return '大差';
             }
 
-            // レースタイムをM:SS.x形式に変換（園田・JRA実際のタイムに合わせてスケーリング）
-            function formatRaceTime(gameSeconds) {
-                let scale;
-                if (currentCourseId === 'sonoda') {
-                    // 園田競馬場の実際の平均タイムに合わせたスケール
-                    // 820m:0:52 / 1230m:1:17 / 1400m:1:28 / 1700m:1:47 / 1870m:1:58 / 2400m:2:35
-                    const sonodaScale = { 820: 1.93, 1230: 1.91, 1400: 1.92, 1700: 1.91, 1870: 1.92, 2400: 1.96 };
-                    scale = sonodaScale[total_dist] || 1.92;
-                } else {
-                    // JRA基本コースの平均タイム
-                    // 1200m:1:09 / 1600m:1:34 / 2000m:1:59 / 2400m:2:24 / 3200m:3:15
-                    const basicScale = { 1200: 1.63, 1600: 1.67, 2000: 1.69, 2400: 1.70, 3200: 1.73 };
-                    scale = basicScale[total_dist] || 1.68;
-                }
-                const realSec = gameSeconds * scale;
-                const m = Math.floor(realSec / 60);
-                const s = (realSec % 60).toFixed(1);
-                return `${m}:${String(s).padStart(4, '0')}`;
-            }
-
-            const winnerHorse = finishedHorses[0];
-            const raceTimeStr = winnerHorse && winnerHorse.raceTime ? formatRaceTime(winnerHorse.raceTime) : '';
+            // 走破タイムはトラック上の時計(raceClock)と同一の値を使用。
+            // raceClockは基準タイム×先頭馬の地力×実測ペースで創発し、先頭ゴール時点で確定する。
+            // これでトラック上の時計と結果画面のタイムが必ず一致し、ハイ＝速い/スロー＝遅いも反映される。
+            const raceTimeStr = raceClock > 0 ? formatRaceTime(raceClock) : '';
 
             let resultHtml = `<div class="text-left max-w-sm mx-auto mb-4 border-b pb-2">`;
             if (raceTimeStr) {
