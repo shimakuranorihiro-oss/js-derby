@@ -2523,9 +2523,17 @@
                     }
                 });
 
-                if (cPace === 'high') {
-                    let posFactor = Math.max(0, 30 - distToLeader) / 30;
-                    staminaCost *= (1.0 + 0.50 * posFactor); // ハイペース時、前方ほど脚を使い終盤に垂れる
+                // ペース×位置取りスタミナ補正
+                // ハイペース：前にいるほど消耗大（競り合い・風抵抗）
+                // スローペース：前にいるほど楽（自分でペースを作れる、追われない）
+                {
+                    let positionRatio = Math.max(0.0, 1.0 - distToLeader / 45.0); // 0=後方, 1=先頭
+                    if (cPace === 'high' || cPace === 'dainige') {
+                        staminaCost *= (1.0 + 0.45 * positionRatio);
+                    } else if (cPace === 'slow') {
+                        staminaCost *= (1.0 - 0.22 * positionRatio);
+                    }
+                    // ミドルペース：位置取り補正なし
                 }
 
                 if (horse.makuriTriggered && cPace === 'high') {
@@ -3145,7 +3153,28 @@
                     let maxAccelLimit = (horse.accelType === 'sharp') ? 0.008 : 0.004;
                     if (horse.makuriTriggered && currentCourseId === 'sonoda') maxAccelLimit = 0.0015;
                     if (horse.skillTimer > 0) maxAccelLimit *= 1.5;
-                    if (inStartDash) maxAccelLimit = Math.max(maxAccelLimit, 0.045); // 発走直後だけ大きく加速できる
+                    if (inStartDash) maxAccelLimit = Math.max(maxAccelLimit, 0.045);
+
+                    // 位置取りミスマッチペナルティ
+                    // 脚質の自然なポジションから大きくズレていると加速しにくい
+                    if (!inStartDash && !horse.makuriTriggered) {
+                        const naturalRankRatio = {
+                            'nige':   0.08,   // 上位8%（先頭付近）
+                            'senko':  0.28,   // 上位28%
+                            'sashi':  0.58,   // 上位58%
+                            'oikomi': 0.82    // 上位82%（後方）
+                        }[horse.type] || 0.5;
+
+                        let currentRank = currentRanking ? currentRanking.indexOf(horse) + 1 : 1;
+                        let rankRatio = currentRank / Math.max(1, allHorses.length);
+                        let mismatch = Math.abs(rankRatio - naturalRankRatio);
+
+                        // 25%以上ズレると加速が落ちる（最大40%まで低下）
+                        if (mismatch > 0.25) {
+                            let penalty = Math.max(0.40, 1.0 - (mismatch - 0.25) * 1.8);
+                            maxAccelLimit *= penalty;
+                        }
+                    }
 
                     acceleration = Math.min(targetAccel, maxAccelLimit);
 
