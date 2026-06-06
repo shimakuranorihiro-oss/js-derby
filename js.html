@@ -310,8 +310,17 @@
             else                    { probHigh = 0.25; probMid = 0.50; probSlow = 0.25; }
 
             if (hasDaiNige) { probHigh += 0.35; probSlow -= 0.15; }
-            if (nigeCount === 0) { probSlow += 0.35; probHigh -= 0.15; } 
-            else if (nigeCount >= 3) { probHigh += 0.25; probSlow -= 0.10; }
+            if (nigeCount === 0) { probSlow += 0.35; probHigh -= 0.15; }
+            else if (nigeCount >= 3) {
+                // 短距離：逃げ多数でハイペースになりやすい
+                // 中距離以上：逃げが多くてもペースは落ち着きやすい
+                let nigeBonus = dist <= 1400 ? 0.25
+                              : dist <= 1700 ? 0.12
+                              : dist <= 1870 ? 0.06
+                              : 0.02;
+                probHigh += nigeBonus;
+                probSlow -= nigeBonus * 0.4;
+            }
 
             let total = Math.max(0.01, probHigh) + Math.max(0.01, probMid) + Math.max(0.01, probSlow);
             probHigh = Math.max(0.01, probHigh) / total;
@@ -2504,12 +2513,7 @@
                     else if (appliedBoost < 1.0) staminaCost *= 1.0 + (appliedBoost - 1.0) * 3.0; // 緩い流れは温存
                 }
 
-                // 距離別の道中スタミナ消費：短距離は脚を使い続けバテやすく、長距離は大きく温存
-                // 820m:×1.30 / 1230m:×1.30 / 1400m:×1.14 / 1600m:×1.0 / 2000m:×0.80 / 2400m:×0.67 / 3200m:×0.50
-                // 距離別の道中スタミナ消費：短距離は脚を使い続けバテやすく、長距離は大きく温存。
-                // 基準分子を1600→1500に下げ、中長距離をさらに一段楽にする。
-                let distConserve = Math.min(1.28, Math.max(0.38, 1500 / total_dist));
-                staminaCost *= distConserve;
+                // 距離補正はbaseDrain側（v1.2）に集約済みのため、ここでは適用しない
 
                 // ダートは砂を掻く負荷で道中の消耗が大きい（芝より厳しい消耗戦になりやすい）
                 if (currentSurface === 'dirt') {
@@ -2524,14 +2528,18 @@
                 });
 
                 // ペース×位置取りスタミナ補正
-                // ハイペース：前にいるほど消耗大（競り合い・風抵抗）
+                // ハイペース：全体的に消耗大＋前にいるほどさらに消耗（競り合い・風抵抗）
                 // スローペース：前にいるほど楽（自分でペースを作れる、追われない）
                 {
                     let positionRatio = Math.max(0.0, 1.0 - distToLeader / 45.0); // 0=後方, 1=先頭
-                    if (cPace === 'high' || cPace === 'dainige') {
-                        staminaCost *= (1.0 + 0.45 * positionRatio);
+                    if (cPace === 'high') {
+                        staminaCost *= 1.25; // ハイペース全体底上げ
+                        staminaCost *= (1.0 + 0.40 * positionRatio); // 前方追加消耗
+                    } else if (cPace === 'dainige') {
+                        staminaCost *= 1.15;
+                        staminaCost *= (1.0 + 0.35 * positionRatio);
                     } else if (cPace === 'slow') {
-                        staminaCost *= (1.0 - 0.22 * positionRatio);
+                        staminaCost *= (1.0 - 0.25 * positionRatio);
                     }
                     // ミドルペース：位置取り補正なし
                 }
