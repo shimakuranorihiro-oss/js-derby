@@ -41,9 +41,10 @@
         </header>
 
         <!-- コース切り替えタブ -->
-        <div class="flex justify-center mb-4 space-x-4">
+        <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
+            <span class="text-sm font-bold text-gray-400">v1.1</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -357,13 +358,15 @@
 
         // 距離別の基準タイム（秒）。中庸ペース・標準的な勝ち馬でこのタイムに収束する。
         // 園田(ダート): 820≒50 / 1230≒74 / 1400≒85 / 1700≒103 / 1870≒114（1400mを1:25.0基準に再校正）
-        // JRA基本     : 1200≒69 / 1600≒94 / 2000≒119 / 2400≒144 / 3200≒195
+        // JRA基本     : 1700≒105(1:45.0) / 1870≒117(1:57.0) / 2400≒155(2:35.0) を基準に再校正
         function parTime(dist) {
             if (currentCourseId === 'sonoda') {
                 if (dist <= 1400) return 50 + (dist - 820) * (35 / 580); // 820→50 / 1400→85
                 return 85 + (dist - 1400) * (29 / 470);                  // 1400→85 / 1870→114
             }
-            return 69 + (dist - 1200) * 0.0625;                          // 1200→69 / 1600→94 / 2000→119
+            // JRA：1700m=105秒(1:45.0) を基点に、約0.077秒/m で増減。
+            // 中長距離をより時計のかかる設定に（1870→約118.1 / 2000→約128.1 / 2400→約158.9）。
+            return 105 + (dist - 1700) * 0.077;
         }
 
         // 秒数を「M:SS.s」または「SS.s」形式に整形
@@ -875,6 +878,7 @@
         let lapPrevClock = 0;          // 前回ラップ記録時のraceClock
         // コーナー通過順位・上がりタイム計測
         let cornerRankings = { first: null, mukou: null, fourth: null }; // 各地点通過時のtop5
+        let cornerPassMarks = [];      // どの通過点を記録済みか {key:'first'|'mukou'|'fourth'}
         let last600StartClock = -1;    // 残り600m通過時のraceClock
         let last600Time = null;        // 上がり600mタイム（秒）
         let paceWavePhase = 0;         // 道中の緩急（波）の位相。レースごとにランダムで起伏の出方を変える
@@ -1171,6 +1175,7 @@
             paceVelSum = 0; paceBaseSum = 0; paceDistAcc = 0; lastLeaderSplitDist = 0;
             lapList = []; lapNextMark = 200; lapPrevClock = 0;
             cornerRankings = { first: null, mukou: null, fourth: null };
+            cornerPassMarks = [];
             last600StartClock = -1; last600Time = null;
             paceWavePhase = Math.random(); // 道中の緩急の波の位相をレースごとにずらす
             paceAnnounced = false;
@@ -2457,17 +2462,28 @@
             if (remainToGoal > spurtDist) {
                 if (cPace === 'high') {
                     paceSpeedMod = 1.04;
-                    // ハイペース：前で速い流れを作る逃げ・先行は脚を使って垂れる／差し・追込は脚を温存できる
-                    if (horse.type === 'nige') paceStaminaMod = 1.42;
-                    else if (horse.type === 'senko') paceStaminaMod = 1.28;
-                    else paceStaminaMod = 1.04;
+                    // ハイペースの厳しさは距離で変わる：短距離は前半から脚を使い切ってバテる。
+                    // 中長距離は前半飛ばしても勝負所まで脚を溜められる＝消耗は緩和。
+                    // 1400m以下:1.0倍 / 1700m:0.72 / 2000m:0.55 / 2400m:0.40 まで逓減
+                    let highSeverity;
+                    if (total_dist <= 1400) {
+                        highSeverity = 1.0;
+                    } else {
+                        highSeverity = Math.max(0.38, 1.0 - (total_dist - 1400) * 0.0006);
+                    }
+                    // 余剰消費分（1.0を超える部分）だけを距離で割り引く
+                    if (horse.type === 'nige')       paceStaminaMod = 1.0 + 0.42 * highSeverity;
+                    else if (horse.type === 'senko') paceStaminaMod = 1.0 + 0.28 * highSeverity;
+                    else                              paceStaminaMod = 1.0 + 0.04 * highSeverity;
                 }
                 else if (cPace === 'slow') { paceSpeedMod = 0.96; paceStaminaMod = 0.85; }
                 else if (cPace === 'dainige') {
                     if (horse === currentLeader) {
-                        paceSpeedMod = 1.06; paceStaminaMod = 1.30; 
+                        // 1頭だけ突出して飛ばす＝道中から激しく消耗
+                        paceSpeedMod = 1.09; paceStaminaMod = 1.55;
                     } else {
-                        paceSpeedMod = 0.96; paceStaminaMod = 0.85; 
+                        // 後続は離れた相手を無理に追わず、自分のペースで運べる（ミドル〜ややスロー）
+                        paceSpeedMod = 0.97; paceStaminaMod = 0.92;
                     }
                 }
             }
@@ -2490,8 +2506,15 @@
 
                 // 距離別の道中スタミナ消費：短距離は脚を使い続けバテやすく、長距離は大きく温存
                 // 820m:×1.30 / 1230m:×1.30 / 1400m:×1.14 / 1600m:×1.0 / 2000m:×0.80 / 2400m:×0.67 / 3200m:×0.50
-                let distConserve = Math.min(1.30, Math.max(0.42, 1600 / total_dist));
+                // 距離別の道中スタミナ消費：短距離は脚を使い続けバテやすく、長距離は大きく温存。
+                // 基準分子を1600→1500に下げ、中長距離をさらに一段楽にする。
+                let distConserve = Math.min(1.28, Math.max(0.38, 1500 / total_dist));
                 staminaCost *= distConserve;
+
+                // ダートは砂を掻く負荷で道中の消耗が大きい（芝より厳しい消耗戦になりやすい）
+                if (currentSurface === 'dirt') {
+                    staminaCost *= 1.12;
+                }
 
                 let isRearPushing = false;
                 allHorses.forEach(h => {
@@ -2592,16 +2615,18 @@
                 let paceSpurtStaminaMod = 1.0;
                 let paceSpurtSpeedMod = 1.0;
                 if (cPace === 'high') {
-                    paceSpurtStaminaMod = 1.08; // ハイペース：スパートでのスタミナ消費
-                    paceSpurtSpeedMod = 0.99;   // わずかに速度も落ちる
+                    // ハイペースの直線での負荷も距離で緩和（長距離は勝負所まで脚が残る）
+                    let highSpurtSev = total_dist <= 1400 ? 1.0 : Math.max(0.3, 1.0 - (total_dist - 1400) * 0.0006);
+                    paceSpurtStaminaMod = 1.0 + 0.08 * highSpurtSev; // 短距離1.08 → 長距離は1.0付近
+                    paceSpurtSpeedMod = 1.0 - 0.01 * highSpurtSev;
                 } else if (cPace === 'slow') {
                     paceSpurtStaminaMod = 0.88; // スローペース：温存した分スパートが軽い
                     paceSpurtSpeedMod = 1.01;   // わずかに速度が乗りやすい
                 } else if (cPace === 'dainige') {
                     if (horse === currentLeader) {
-                        paceSpurtStaminaMod = 1.35; // 大逃げ馬は直線でガス欠
+                        paceSpurtStaminaMod = 1.45; // 大逃げ馬は直線で大ガス欠（止まりやすい）
                     } else {
-                        paceSpurtStaminaMod = 0.90; // 後続は余力たっぷり
+                        paceSpurtStaminaMod = 0.92; // 後続は余力ありだが、離された分の差し脚は必要
                     }
                 }
 
@@ -2668,11 +2693,15 @@
                 // ==========================================
                 if (horse.currentStamina > 0) {
                     let staminaFade = 1.0;
-                    
-                    // スタミナが「35」を切ると、0に向かってジワジワとスピードが低下する（最大0.88倍に緩やかにシフト）
-                    if (horse.currentStamina < 35) {
-                        let t = horse.currentStamina / 35; // 1.0 (残35) -> 0.0 (残0)
-                        staminaFade = 0.88 + 0.12 * t; 
+
+                    // スタミナが「45」を切ると、0に向かってジワジワとスピードが低下する
+                    // 芝：下限0.70 / ダート：下限0.62（ダートは消耗戦＝バテるとより止まる）
+                    const fadeFloor = currentSurface === 'dirt' ? 0.66 : 0.74;
+                    if (horse.currentStamina < 42) {
+                        let t = horse.currentStamina / 42; // 1.0 (残42) -> 0.0 (残0)
+                        // カーブを少し効かせ、残量が減るほど加速度的に垂れる
+                        let eased = t * t * 0.4 + t * 0.6;
+                        staminaFade = fadeFloor + (1.0 - fadeFloor) * eased;
                     }
                     
                     let reserveKire = 1.0;
@@ -3825,23 +3854,30 @@
                     const refStrength = 1.35;
                     let strengthFactor = currentLeader.actualSpeedBase / refStrength;
                     strengthFactor = Math.max(0.94, Math.min(1.06, strengthFactor));
-                    // ペース：実測したペース指標（先頭が前半どれだけ速く流れたか）をそのまま時計に反映。
-                    // 速い流れ＝速い時計、緩い流れ＝遅い時計。極端な値はクランプして暴れを抑える。
+                    // ペース：実測ペース指標に加え、確定したペースタイプでも時計を動かす。
+                    // ハイは前半が速くても後半が大きく垂れるため、全体時計はむしろ遅くなる（消耗戦）。
+                    // スローは前半緩いが上がり勝負で締まり、全体時計は標準よりやや遅い程度。
                     let paceSpeedFactor = Math.max(0.96, Math.min(1.05, measuredPaceIndex));
+                    let paceTypeFactor = 1.0;
+                    if (currentPace === 'high')      paceTypeFactor = 0.990;
+                    else if (currentPace === 'dainige') paceTypeFactor = 0.995;
+                    else if (currentPace === 'slow') paceTypeFactor = 0.992;
+                    paceSpeedFactor *= paceTypeFactor;
                     // 発走直後は加速途上で時計が遅い（最初の1ハロンが最も遅い）。CLOCK_CALで全体を基準タイムに再校正。
                     let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
-                    const CLOCK_CAL = 1.0195;
+                    const CLOCK_CAL = 1.005;
                     // 道中の速度配分（脚質・ペース連動のラップ・プロファイル）。先頭の進捗 p(0→1) で形を変える。
                     // 各形状は区間平均≒1.0に正規化してあるので総タイム(=1:25基準)は変えず、ラップにだけ起伏を作る。
                     // ハイ/大逃げ＝前傾(テン速い→上がり失速)、スロー＝瞬発戦(道中緩い→上がり最速)、ミドル＝緩やかな前傾。
                     let p = total_dist > 0 ? Math.min(1, frontNow / total_dist) : 0;
                     let paceShape;
                     if (currentPace === 'high' || currentPace === 'dainige') {
-                        paceShape = 1 + 0.16 * (1/3 - p * p);   // 前傾：序盤速く終盤フェード
+                        // 前傾：テンは速いが後半は明確にラップが落ちる（消耗戦）。係数を強めて起伏を大きく。
+                        paceShape = 1 + 0.34 * (1/3 - p * p);   // 序盤≒+0.11 / 終盤≒-0.23
                     } else if (currentPace === 'slow') {
-                        paceShape = 1 + 0.16 * (p * p - 1/3);   // 後傾：道中緩く上がりで加速（ヨーイドン）
+                        paceShape = 1 + 0.20 * (p * p - 1/3);   // 後傾：道中緩く上がりで加速（ヨーイドン）
                     } else {
-                        paceShape = 1 + 0.07 * (0.5 - p);       // ミドル：緩やかな前傾
+                        paceShape = 1 + 0.10 * (0.5 - p);       // ミドル：緩やかな前傾
                     }
                     // 道中の細かな緩急（2周期の波）。位相はレースごとに変わる。区間積分≒0でタイムは不変。
                     let paceWave = 0.025 * Math.sin(2 * Math.PI * (2 * p + paceWavePhase));
@@ -3860,19 +3896,28 @@
                 }
 
                 // コーナー通過順位・上がり600m計測
-                // 先頭の run_dist ベースで各地点通過を検知し、そのフレームのcurrentRankingを記録
+                // 各通過点で「全馬の順位」を記録し、各馬の passOrder 配列に番手を追記する
                 if (finishedHorses.length === 0 && isRacing) {
-                    const sorted5 = () => [...currentRanking].slice(0, 5).map(h => h.name);
-                    // 1コーナー：全距離でスタートから 約25% 地点（最低200m）
+                    // 1コーナー：スタートから約25%地点（最低200m）
                     const firstCornerDist  = Math.max(200, Math.round(total_dist * 0.25 / 100) * 100);
-                    // 向こう正面：スタートから 約45% 地点
+                    // 向こう正面：約45%地点
                     const mukouDist        = Math.max(400, Math.round(total_dist * 0.45 / 100) * 100);
                     // 4コーナー：ゴール残り600m地点
                     const fourthCornerDist = total_dist - 600;
 
-                    if (!cornerRankings.first  && frontNow >= firstCornerDist)  cornerRankings.first  = sorted5();
-                    if (!cornerRankings.mukou  && frontNow >= mukouDist)        cornerRankings.mukou  = sorted5();
-                    if (!cornerRankings.fourth && frontNow >= fourthCornerDist && fourthCornerDist > 0) cornerRankings.fourth = sorted5();
+                    // その瞬間の順位（currentRankingは先頭順）を全馬に書き込む
+                    const recordPass = (key) => {
+                        if (cornerPassMarks.includes(key)) return;
+                        cornerPassMarks.push(key);
+                        currentRanking.forEach((h, idx) => {
+                            if (!h.passOrder) h.passOrder = [];
+                            h.passOrder.push(idx + 1); // 1始まりの番手
+                        });
+                    };
+
+                    if (frontNow >= firstCornerDist)  recordPass('first');
+                    if (frontNow >= mukouDist)        recordPass('mukou');
+                    if (fourthCornerDist > 0 && frontNow >= fourthCornerDist) recordPass('fourth');
 
                     // 上がり600m：先頭が残り600m地点を通過した瞬間のraceClockを記録
                     if (last600StartClock < 0 && fourthCornerDist > 0 && frontNow >= fourthCornerDist) {
@@ -4355,22 +4400,17 @@
                 }
             }
 
-            // コーナー通過順位
-            const cornerLabels = [
-                { key: 'first',  label: '1C通過' },
-                { key: 'mukou',  label: '向正面' },
-                { key: 'fourth', label: '4C通過' },
-            ];
-            const hasCorner = cornerLabels.some(c => cornerRankings[c.key] && cornerRankings[c.key].length > 0);
-            if (hasCorner) {
+            // 各馬の通過順（競馬新聞の馬柱形式：例 9-9-5）
+            const hasPass = finishedHorses.slice(0, 5).some(h => h && h.passOrder && h.passOrder.length > 0);
+            if (hasPass) {
                 resultHtml += `<div class="mt-3 pt-2 border-t border-gray-200">`;
-                resultHtml += `<div class="text-xs font-bold text-gray-500 mb-1">📍 通過順位 (上位5頭)</div>`;
-                cornerLabels.forEach(({ key, label }) => {
-                    const ranking = cornerRankings[key];
-                    if (!ranking || ranking.length === 0) return;
-                    const names = ranking.map((name, idx) => `<span class="text-gray-700">${idx+1}.${name}</span>`).join(' ');
-                    resultHtml += `<div class="text-xs mb-1"><span class="inline-block w-14 text-gray-400 font-bold">${label}</span> ${names}</div>`;
-                });
+                resultHtml += `<div class="text-xs font-bold text-gray-500 mb-1">📍 通過順 (1C-向正面-4C)</div>`;
+                for (let i = 0; i < 5; i++) {
+                    const h = finishedHorses[i];
+                    if (!h) continue;
+                    const po = (h.passOrder && h.passOrder.length > 0) ? h.passOrder.join('-') : '－';
+                    resultHtml += `<div class="text-xs mb-1"><span class="inline-block w-8 text-gray-400 font-bold">${i+1}着</span> <span class="text-gray-700">${h.horseNum}番 ${h.name}</span> <span class="font-mono font-bold text-indigo-700 ml-1">${po}</span></div>`;
+                }
                 resultHtml += `</div>`;
             }
 
