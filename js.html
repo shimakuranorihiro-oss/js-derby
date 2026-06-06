@@ -302,11 +302,12 @@
             let r = Math.random();
             let probHigh = 0.33, probMid = 0.34, probSlow = 0.33;
 
-            if (dist <= 1600)       { probHigh = 0.70; probMid = 0.25; probSlow = 0.05; }
-            else if (dist <= 1700)  { probHigh = 0.30; probMid = 0.48; probSlow = 0.22; } // 1700m：中距離、やや落ち着く
-            else if (dist <= 1870)  { probHigh = 0.20; probMid = 0.48; probSlow = 0.32; } // 1870m：中距離、スローが増える
-            else if (dist <= 2400)  { probHigh = 0.12; probMid = 0.40; probSlow = 0.48; } // 2400m：長距離、スロー基調
-            else if (dist >= 3000)  { probHigh = 0.05; probMid = 0.25; probSlow = 0.70; }
+            if (dist <= 1400)       { probHigh = 0.70; probMid = 0.25; probSlow = 0.05; }
+            else if (dist <= 1600)  { probHigh = 0.50; probMid = 0.35; probSlow = 0.15; }
+            else if (dist <= 1700)  { probHigh = 0.15; probMid = 0.50; probSlow = 0.35; } // 1700m：ハイペースは稀
+            else if (dist <= 1870)  { probHigh = 0.08; probMid = 0.45; probSlow = 0.47; } // 1870m：スロー〜ミドル基調
+            else if (dist <= 2400)  { probHigh = 0.05; probMid = 0.35; probSlow = 0.60; } // 2400m：スロー基調
+            else if (dist >= 3000)  { probHigh = 0.02; probMid = 0.20; probSlow = 0.78; }
             else                    { probHigh = 0.25; probMid = 0.50; probSlow = 0.25; }
 
             if (hasDaiNige) { probHigh += 0.35; probSlow -= 0.15; }
@@ -3227,8 +3228,8 @@
             // スパートするほど急激に消耗する。
             // ==========================================
 
-            // コース・距離別の基本消費レート
-            let baseDrainRate = currentCourseId === 'basic' ? 0.028 : 0.032;
+            // コース・距離別の基本消費レート（v1.21: 約2倍に引き上げてバテを再現）
+            let baseDrainRate = currentCourseId === 'basic' ? 0.060 : 0.070;
             let distFactor = Math.min(1.28, Math.max(0.38, 1500 / total_dist));
             const baseDrain = baseDrainRate * distFactor;
 
