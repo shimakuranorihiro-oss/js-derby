@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.1</span>
+            <span class="text-sm font-bold text-gray-400">v1.2</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -3184,28 +3184,50 @@
             
             horse.currentVelocity += acceleration;
 
-            // 基本スタミナ消費倍率（baseDrainRate）をマイルドに調整
-            let baseDrainRate = currentCourseId === 'basic' ? 0.038 : 0.044;
-            let distFactor = 2400 / total_dist;
-            // 長距離ほどbaseDrainRateを下げる（distConserveと二重効果）
-            if (total_dist > 2400) distFactor = Math.pow(distFactor, 1.12);
-            else if (total_dist < 2400) distFactor = Math.pow(distFactor, 0.85);
-            const staminaDrainRate = baseDrainRate * distFactor; 
-            
+            // ==========================================
+            // v1.2 スタミナ消費システム：速度ベース
+            // 200mラップの速さに応じて消費量が変わる。
+            // スパートするほど急激に消耗する。
+            // ==========================================
+
+            // コース・距離別の基本消費レート
+            let baseDrainRate = currentCourseId === 'basic' ? 0.028 : 0.032;
+            let distFactor = Math.min(1.28, Math.max(0.38, 1500 / total_dist));
+            const baseDrain = baseDrainRate * distFactor;
+
+            // 楽に走れるペース（基準速度の92%）
+            let comfortV = horse.actualSpeedBase * 0.92;
+
+            // 速度比：1.0が楽なペース、1.0超でスパート領域
+            let vRatio = Math.max(0.15, horse.currentVelocity / comfortV);
+
+            // 速度^1.8乗で消費増加（スパートは急激に消耗）
+            // vRatio=1.0 → 1.0倍 / vRatio=1.2 → 1.37倍 / vRatio=1.5 → 1.93倍
+            let speedDrainFactor = Math.min(4.0, Math.pow(vRatio, 1.8));
+
+            // 今フレームの移動距離（これをベースにすることで「距離あたりの消費」に）
+            let distTraveled = horse.currentVelocity * speedMultiplier;
+
+            // コーナーの外回りペナルティ（維持）
             let cornerPenalty = 1.0;
             if (currentCourseId === 'sonoda') {
-                let C = COURSES.sonoda.C;
-                let L = COURSES.sonoda.L;
-                let R = COURSES.sonoda.R;
-                let currentPos = (horse.run_dist + COURSES.sonoda.start_dist) % C;
-                let isCorner = (currentPos >= L && currentPos < L + Math.PI * R) || (currentPos >= 2 * L + Math.PI * R);
-                
-                if (isCorner && horse.lane > 8.5) {
-                    cornerPenalty = 1.0 + (horse.lane - 8.5) * 0.015; 
+                let cC = COURSES.sonoda.C, cL = COURSES.sonoda.L, cR = COURSES.sonoda.R;
+                let currentPos = (horse.run_dist + COURSES.sonoda.start_dist) % cC;
+                let onCorner = (currentPos >= cL && currentPos < cL + Math.PI * cR) || (currentPos >= 2 * cL + Math.PI * cR);
+                if (onCorner && horse.lane > 8.5) {
+                    cornerPenalty = 1.0 + (horse.lane - 8.5) * 0.015;
                 }
             }
-            
-            horse.currentStamina -= staminaCost * horse.currentVelocity * staminaDrainRate * cornerPenalty * speedMultiplier;
+
+            // staminaCostの残存修正（レーンバイアス・接触・ドラフト等）はそのまま活かす
+            // ただし速度ベースで既にスパート分が込みなので、スパート区間の追加倍率は半減
+            let remainingCostMod = staminaCost;
+            if (remainToGoal <= spurtDist) {
+                // スパート時のstaminaCostは速度ベースで吸収される分を引き算
+                remainingCostMod = 1.0 + (staminaCost - 1.0) * 0.4;
+            }
+
+            horse.currentStamina -= remainingCostMod * speedDrainFactor * baseDrain * distTraveled * cornerPenalty;
             
             if (horse.currentStamina < 0) horse.currentStamina = 0;
 
