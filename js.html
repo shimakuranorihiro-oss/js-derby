@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.33</span>
+            <span class="text-sm font-bold text-gray-400">v1.34</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -117,7 +117,9 @@
                             <th scope="col" class="px-4 py-3 border-b">馬名 (調子)</th>
                             <th scope="col" class="px-4 py-3 border-b text-right">単勝オッズ</th>
                             <th scope="col" class="px-4 py-3 border-b text-right">設定勝率</th>
-                            <th scope="col" class="px-4 py-3 border-b text-right text-purple-600 font-bold">シミュ勝率</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right text-purple-600 font-bold">1着率</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right text-blue-600 font-bold">2着率</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right text-green-600 font-bold">3着率</th>
                             <th scope="col" class="px-4 py-3 border-b text-right font-bold">1着回数</th>
                         </tr>
                     </thead>
@@ -126,6 +128,8 @@
                     </tbody>
                 </table>
             </div>
+            <!-- ペース集計 -->
+            <div id="simPaceStats" class="mt-6 text-left"></div>
             <button id="closeSimBtn" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-10 rounded-full text-lg shadow-md transition-transform transform hover:scale-105">
                 閉じる
             </button>
@@ -3406,12 +3410,12 @@
                 }
             }
             
-            return simHorses.sort((a, b) => b.run_dist - a.run_dist);
+            const sorted = simHorses.sort((a, b) => b.run_dist - a.run_dist);
+            return { horses: sorted, pace: simPace };
         }
 
         function simulateSingleRace() {
-            let result = simulateRaceComplete(currentHorses, total_dist);
-            return result[0];
+            return simulateRaceComplete(currentHorses, total_dist);
         }
 
         // --- 1万回全馬シミュレーション＆CSV出力 ---
@@ -3530,17 +3534,42 @@
             simBtn.disabled = true;
             startBtn.disabled = true;
             
-            let winCounts = {};
-            currentHorses.forEach(h => winCounts[h.name] = 0);
-            
+            let winCounts = {}, placeCounts = {}, showCounts = {};
+            currentHorses.forEach(h => {
+                winCounts[h.name] = 0;
+                placeCounts[h.name] = 0;
+                showCounts[h.name] = 0;
+            });
+            // ペース集計：各ペース回数 + そのペース時の1着脚質内訳
+            const paceKeys = ['dainige', 'high', 'middle', 'slow'];
+            const paceLabels = { dainige: '大逃げ', high: 'ハイペース', middle: 'ミドルペース', slow: 'スローペース' };
+            const typeNames4 = { nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追込' };
+            let paceCounts = { dainige: 0, high: 0, middle: 0, slow: 0 };
+            let paceWinnerType = {
+                dainige: { nige:0, senko:0, sashi:0, oikomi:0 },
+                high:    { nige:0, senko:0, sashi:0, oikomi:0 },
+                middle:  { nige:0, senko:0, sashi:0, oikomi:0 },
+                slow:    { nige:0, senko:0, sashi:0, oikomi:0 }
+            };
+
             const totalSims = 1000;
             let currentSim = 0;
-            const batchSize = 20; 
+            const batchSize = 20;
 
             function runBatch() {
                 for (let i = 0; i < batchSize && currentSim < totalSims; i++) {
-                    let winner = simulateSingleRace();
-                    if(winner) winCounts[winner.name]++;
+                    const sim = simulateSingleRace();
+                    if (sim && sim.horses) {
+                        const top = sim.horses;
+                        if (top[0]) winCounts[top[0].name]++;
+                        if (top[1]) placeCounts[top[1].name]++;
+                        if (top[2]) showCounts[top[2].name]++;
+                        const pace = sim.pace || 'middle';
+                        if (paceCounts[pace] !== undefined) paceCounts[pace]++;
+                        if (top[0] && paceWinnerType[pace]) {
+                            paceWinnerType[pace][top[0].type]++;
+                        }
+                    }
                     currentSim++;
                 }
 
@@ -3548,7 +3577,7 @@
                     simBtn.innerHTML = `⏳ ${currentSim} / ${totalSims} 計算中...`;
                     setTimeout(runBatch, 0); 
                 } else {
-                    showSimResult(winCounts, totalSims);
+                    showSimResult(winCounts, placeCounts, showCounts, paceCounts, paceWinnerType, paceLabels, typeNames4, totalSims);
                     simBtn.innerHTML = originalText;
                     simBtn.disabled = false;
                     startBtn.disabled = false;
@@ -3558,38 +3587,72 @@
             setTimeout(runBatch, 10);
         });
 
-        function showSimResult(winCounts, total) {
+        function showSimResult(winCounts, placeCounts, showCounts, paceCounts, paceWinnerType, paceLabels, typeNames4, total) {
             const tbody = document.getElementById('simResultTableBody');
             tbody.innerHTML = '';
-            
+
             currentHorses.forEach((horse) => {
                 const tr = document.createElement('tr');
                 tr.className = "bg-white border-b hover:bg-gray-50";
-                
-                const winCount = winCounts[horse.name];
-                const actualWinRate = (winCount / total * 100).toFixed(1) + '%';
+
+                const winCount  = winCounts[horse.name]  || 0;
+                const placeCount= placeCounts[horse.name] || 0;
+                const showCount = showCounts[horse.name]  || 0;
+                const w1 = (winCount  / total * 100).toFixed(1) + '%';
+                const w2 = (placeCount/ total * 100).toFixed(1) + '%';
+                const w3 = (showCount / total * 100).toFixed(1) + '%';
                 const expectedWinRate = (horse.currentWinRate * 100).toFixed(1) + '%';
-                
+
                 let diffColor = 'text-gray-600 font-bold';
-                if (winCount / total > horse.currentWinRate + 0.015) diffColor = 'text-red-600 font-black'; 
-                if (winCount / total < horse.currentWinRate - 0.015) diffColor = 'text-blue-600 font-bold'; 
-                
+                if (winCount / total > horse.currentWinRate + 0.015) diffColor = 'text-red-600 font-black';
+                if (winCount / total < horse.currentWinRate - 0.015) diffColor = 'text-blue-600 font-bold';
+
                 tr.innerHTML = `
                     <td class="px-4 py-3 font-medium text-gray-900 flex items-center justify-center">
                         <span class="inline-block w-5 py-0.5 text-center rounded text-xs mr-2 font-bold" style="background-color:${horse.wakuBg}; color:${horse.wakuText}; border:1px solid #ccc;">${horse.wakuNum}</span>
                         ${horse.horseNum}
                     </td>
-                    <td class="px-4 py-3 font-bold">
-                        ${horse.name} <span class="${horse.condition.color} ml-1">${horse.condition.icon}</span>
-                    </td>
+                    <td class="px-4 py-3 font-bold">${horse.name} <span class="${horse.condition.color} ml-1">${horse.condition.icon}</span></td>
                     <td class="px-4 py-3 text-right">${horse.odds.toFixed(1)}</td>
                     <td class="px-4 py-3 text-right">${expectedWinRate}</td>
-                    <td class="px-4 py-3 text-right ${diffColor}">${actualWinRate}</td>
+                    <td class="px-4 py-3 text-right ${diffColor}">${w1}</td>
+                    <td class="px-4 py-3 text-right text-blue-600">${w2}</td>
+                    <td class="px-4 py-3 text-right text-green-600">${w3}</td>
                     <td class="px-4 py-3 text-right font-bold text-gray-800">${winCount}回</td>
                 `;
                 tbody.appendChild(tr);
             });
-            
+
+            // ペース集計表示
+            const paceDiv = document.getElementById('simPaceStats');
+            const paceKeys = ['dainige', 'high', 'middle', 'slow'];
+            let paceHtml = `<div class="border-t pt-4 mt-2">
+                <div class="font-extrabold text-gray-700 mb-3 text-lg flex items-center"><span class="mr-2">🏇</span>ペース別集計</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`;
+
+            paceKeys.forEach(pk => {
+                const cnt = paceCounts[pk] || 0;
+                if (cnt === 0) return;
+                const pct = (cnt / total * 100).toFixed(1);
+                const wt  = paceWinnerType[pk];
+                const typeTotal = Object.values(wt).reduce((a,b) => a+b, 0);
+                let typeBars = Object.entries(wt).map(([type, n]) => {
+                    if (n === 0) return '';
+                    const tp = typeTotal > 0 ? (n/typeTotal*100).toFixed(0) : 0;
+                    const colors = {nige:'bg-red-400',senko:'bg-orange-400',sashi:'bg-blue-400',oikomi:'bg-purple-400'};
+                    return `<span class="inline-flex items-center mr-2 text-xs"><span class="inline-block w-2 h-2 rounded-full ${colors[type]||'bg-gray-400'} mr-1"></span>${typeNames4[type]} ${tp}%</span>`;
+                }).join('');
+
+                const paceColor = {dainige:'border-fuchsia-400 bg-fuchsia-50',high:'border-red-400 bg-red-50',middle:'border-yellow-400 bg-yellow-50',slow:'border-blue-400 bg-blue-50'}[pk] || 'border-gray-300 bg-gray-50';
+                paceHtml += `<div class="rounded-lg border-2 ${paceColor} p-3">
+                    <div class="font-bold text-gray-800">${paceLabels[pk]} <span class="text-gray-500 font-normal text-sm">${cnt}回 (${pct}%)</span></div>
+                    <div class="mt-1 text-xs text-gray-600">1着脚質: ${typeBars || '―'}</div>
+                </div>`;
+            });
+
+            paceHtml += `</div></div>`;
+            paceDiv.innerHTML = paceHtml;
+
             simResultPanel.classList.remove('hidden');
             setTimeout(() => {
                 simResultPanel.classList.remove('opacity-0', 'scale-95');
