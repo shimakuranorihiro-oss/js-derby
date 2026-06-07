@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.24</span>
+            <span class="text-sm font-bold text-gray-400">v1.25</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -3735,34 +3735,55 @@
             let finalStraightLen = L;
             
             if (currentCourseId === 'sonoda') {
-                // 長距離ほど道中のスピードを落として勝負所からの速度感を統一
-                let midSpeed = total_dist >= 2400 ? 0.48
-                             : total_dist >= 1870 ? 0.54
-                             : total_dist >= 1700 ? 0.60
-                             : total_dist >= 1400 ? 0.80
-                             : 0.92; // 820m・1230m：スプリント戦は速いペースで
 
-                // 短距離ほど最終直線のspeedMultiplierを上げる（820mは直線が全体の30%を占めるため）
-                let finalStraightMult = total_dist <= 1000 ? 0.28
-                                      : total_dist <= 1300 ? 0.22
-                                      : 0.18;
+                if (total_dist <= 1000) {
+                    // ========================================
+                    // 820m戦：ラップタイムを均一に揃える設計
+                    // 200m × 12.5秒 → speedMult 0.38
+                    // 200m × 11秒台 → speedMult 0.43
+                    // 全区間ほぼ均一なspeedMultで一定ペース感を出す
+                    // ========================================
+                    if (currentDist < 200) {
+                        // 序盤200m：ゲートダッシュ〜加速 → 12.5秒ペース
+                        let ratio = currentDist / 200;
+                        speedMultiplier = 0.32 + (0.38 - 0.32) * ratio;
+                    } else if (remainToGoal <= finalStraightLen) {
+                        // 最終直線：11秒台ペースを維持（小差のズーム演出）
+                        speedMultiplier = 0.41;
+                    } else if (remainToGoal <= finalStraightLen + 150) {
+                        // 直線手前の切り替え
+                        let ratio = (remainToGoal - finalStraightLen) / 150;
+                        speedMultiplier = 0.41 + (0.43 - 0.41) * ratio;
+                    } else {
+                        // 中間：11秒台ペース
+                        speedMultiplier = 0.43;
+                    }
 
-                // 序盤スロー区間も短距離では短くする
-                let startSlowDist = Math.min(300, total_dist * 0.30);
-                let transitionEndDist = startSlowDist + Math.min(350, total_dist * 0.35);
-
-                if (remainToGoal <= finalStraightLen) {
-                    speedMultiplier = finalStraightMult;
-                } else if (remainToGoal <= finalStraightLen + 300) {
-                    let ratio = (remainToGoal - finalStraightLen) / 300;
-                    speedMultiplier = finalStraightMult + ((midSpeed - finalStraightMult) * ratio);
-                } else if (currentDist < startSlowDist) {
-                    speedMultiplier = 0.45;
-                } else if (currentDist < transitionEndDist) {
-                    let ratio = (currentDist - startSlowDist) / (transitionEndDist - startSlowDist);
-                    speedMultiplier = 0.45 + ((midSpeed - 0.45) * ratio);
                 } else {
-                    speedMultiplier = midSpeed;
+                    // 1230m以上：従来のロジック
+                    let midSpeed = total_dist >= 2400 ? 0.48
+                                 : total_dist >= 1870 ? 0.54
+                                 : total_dist >= 1700 ? 0.60
+                                 : total_dist >= 1400 ? 0.80
+                                 : 0.75; // 1230m
+
+                    let finalStraightMult = total_dist <= 1300 ? 0.22 : 0.18;
+                    let startSlowDist = Math.min(300, total_dist * 0.25);
+                    let transitionEndDist = startSlowDist + Math.min(350, total_dist * 0.30);
+
+                    if (remainToGoal <= finalStraightLen) {
+                        speedMultiplier = finalStraightMult;
+                    } else if (remainToGoal <= finalStraightLen + 300) {
+                        let ratio = (remainToGoal - finalStraightLen) / 300;
+                        speedMultiplier = finalStraightMult + ((midSpeed - finalStraightMult) * ratio);
+                    } else if (currentDist < startSlowDist) {
+                        speedMultiplier = 0.45;
+                    } else if (currentDist < transitionEndDist) {
+                        let ratio = (currentDist - startSlowDist) / (transitionEndDist - startSlowDist);
+                        speedMultiplier = 0.45 + ((midSpeed - 0.45) * ratio);
+                    } else {
+                        speedMultiplier = midSpeed;
+                    }
                 }
             } else {
                 if (remainToGoal <= finalStraightLen) {
