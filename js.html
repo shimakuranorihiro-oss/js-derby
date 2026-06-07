@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.28</span>
+            <span class="text-sm font-bold text-gray-400">v1.29</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -372,7 +372,7 @@
         // JRA基本     : 1700≒105(1:45.0) / 1870≒117(1:57.0) / 2400≒155(2:35.0) を基準に再校正
         function parTime(dist) {
             if (currentCourseId === 'sonoda') {
-                if (dist <= 1400) return 48 + (dist - 820) * (37 / 580); // 820→48 / 1400→85
+                if (dist <= 1400) return 48.5 + (dist - 820) * (36.5 / 580); // 820→48.5 / 1400→85
                 return 85 + (dist - 1400) * (29 / 470);                  // 1400→85 / 1870→114
             }
             // JRA：1700m=105秒(1:45.0) を基点に、約0.077秒/m で増減。
@@ -3964,10 +3964,10 @@
                     let p = total_dist > 0 ? Math.min(1, frontNow / total_dist) : 0;
                     let paceShape;
                     if (total_dist <= 1000) {
-                        // 820m専用：200mごとに0.5秒ずつ加速するネガティブスプリットパターン
-                        // 1st 12.5s / 2nd 12.0s / 3rd 11.5s / 4th 11.0s
-                        // paceShape = 0.917 + 0.174×p（平均≒1.0）
-                        paceShape = 0.917 + 0.174 * p;
+                        // 820m専用：前傾パターン（速い→徐々に失速）
+                        // 1st ~11.3s / 2nd ~11.7s / 3rd ~12.1s / 4th ~12.5s相当
+                        // paceShape = 1.07 - 0.14×p（平均=1.0）
+                        paceShape = 1.07 - 0.14 * p;
                     } else if (currentPace === 'high' || currentPace === 'dainige') {
                         // 前傾：テンは速いが後半は明確にラップが落ちる（消耗戦）。係数を強めて起伏を大きく。
                         paceShape = 1 + 0.34 * (1/3 - p * p);   // 序盤≒+0.11 / 終盤≒-0.23
