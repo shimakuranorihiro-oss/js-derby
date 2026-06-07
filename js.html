@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.25</span>
+            <span class="text-sm font-bold text-gray-400">v1.26</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -367,11 +367,11 @@
         }
 
         // 距離別の基準タイム（秒）。中庸ペース・標準的な勝ち馬でこのタイムに収束する。
-        // 園田(ダート): 820≒50 / 1230≒74 / 1400≒85 / 1700≒103 / 1870≒114（1400mを1:25.0基準に再校正）
+        // 園田(ダート): 820≒49 / 1230≒73 / 1400≒85 / 1700≒103 / 1870≒114
         // JRA基本     : 1700≒105(1:45.0) / 1870≒117(1:57.0) / 2400≒155(2:35.0) を基準に再校正
         function parTime(dist) {
             if (currentCourseId === 'sonoda') {
-                if (dist <= 1400) return 50 + (dist - 820) * (35 / 580); // 820→50 / 1400→85
+                if (dist <= 1400) return 49 + (dist - 820) * (36 / 580); // 820→49 / 1400→85
                 return 85 + (dist - 1400) * (29 / 470);                  // 1400→85 / 1870→114
             }
             // JRA：1700m=105秒(1:45.0) を基点に、約0.077秒/m で増減。
