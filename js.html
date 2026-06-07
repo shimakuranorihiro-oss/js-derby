@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.26</span>
+            <span class="text-sm font-bold text-gray-400">v1.27</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -368,10 +368,11 @@
 
         // 距離別の基準タイム（秒）。中庸ペース・標準的な勝ち馬でこのタイムに収束する。
         // 園田(ダート): 820≒49 / 1230≒73 / 1400≒85 / 1700≒103 / 1870≒114
+        // ※820mはCLOCK_CAL・dashClockFactor補正分を考慮して48秒設定→表示は49秒前後に収束
         // JRA基本     : 1700≒105(1:45.0) / 1870≒117(1:57.0) / 2400≒155(2:35.0) を基準に再校正
         function parTime(dist) {
             if (currentCourseId === 'sonoda') {
-                if (dist <= 1400) return 49 + (dist - 820) * (36 / 580); // 820→49 / 1400→85
+                if (dist <= 1400) return 48 + (dist - 820) * (37 / 580); // 820→48 / 1400→85
                 return 85 + (dist - 1400) * (29 / 470);                  // 1400→85 / 1870→114
             }
             // JRA：1700m=105秒(1:45.0) を基点に、約0.077秒/m で増減。
@@ -3228,8 +3229,11 @@
 
             // 基本消費レート = 各馬のスタミナ ÷ レース距離
             // 通常ペース・平均的な位置で走ると60%消費 → ペース・位置補正で80-90%に
-            // 通常ペースで約45%消費 → ペース・位置補正込みで55〜70%に収まる設計
-            const targetRatio = currentSurface === 'dirt' ? 0.48 : 0.44;
+            // 短距離スプリントは全力勝負なので消費率を高く設定
+            // 820m: 65%（高ペース時はバテる）/ 1400m以上: 48%
+            const targetRatio = currentSurface === 'dirt'
+                ? (total_dist <= 1000 ? 0.65 : total_dist <= 1300 ? 0.55 : 0.48)
+                : (total_dist <= 1000 ? 0.58 : total_dist <= 1300 ? 0.50 : 0.44);
             const baseDrain = (horse.initialStamina * targetRatio) / total_dist;
 
             // 楽に走れるペース（基準速度の92%）
@@ -3738,24 +3742,21 @@
 
                 if (total_dist <= 1000) {
                     // ========================================
-                    // 820m戦：ラップタイムを均一に揃える設計
-                    // 200m × 12.5秒 → speedMult 0.38
-                    // 200m × 11秒台 → speedMult 0.43
-                    // 全区間ほぼ均一なspeedMultで一定ペース感を出す
+                    // 820m戦：ラップタイム設計
+                    // 序盤200m → 12.5秒ペース（speedMult 0.38）
+                    // 中間     → 11秒台ペース（speedMult 0.43）
+                    // 直線     → 視覚的に適度な速さ（speedMult 0.30）
                     // ========================================
                     if (currentDist < 200) {
-                        // 序盤200m：ゲートダッシュ〜加速 → 12.5秒ペース
                         let ratio = currentDist / 200;
                         speedMultiplier = 0.32 + (0.38 - 0.32) * ratio;
                     } else if (remainToGoal <= finalStraightLen) {
-                        // 最終直線：11秒台ペースを維持（小差のズーム演出）
-                        speedMultiplier = 0.41;
+                        // 最終直線：視覚的に速く見えすぎないよう調整
+                        speedMultiplier = 0.30;
                     } else if (remainToGoal <= finalStraightLen + 150) {
-                        // 直線手前の切り替え
                         let ratio = (remainToGoal - finalStraightLen) / 150;
-                        speedMultiplier = 0.41 + (0.43 - 0.41) * ratio;
+                        speedMultiplier = 0.30 + (0.43 - 0.30) * ratio;
                     } else {
-                        // 中間：11秒台ペース
                         speedMultiplier = 0.43;
                     }
 
