@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.31</span>
+            <span class="text-sm font-bold text-gray-400">v1.32</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2600,7 +2600,7 @@
 
                 if (horse === currentLeader && horse.currentStamina > 0) {
                     // 風抵抗ペナルティマイルド化
-                    let windResistance = currentCourseId === 'basic' ? 1.30 : 1.22; 
+                    let windResistance = currentCourseId === 'basic' ? 1.14 : 1.10;
                     staminaCost *= windResistance;
                     currentSpeed *= 0.985; 
 
@@ -2729,7 +2729,7 @@
                     staminaCost = spurtStaminaCost * paceSpurtStaminaMod;
 
                     if (horse === currentLeader) {
-                        staminaCost *= currentCourseId === 'basic' ? 1.30 : 1.22; // スパート時先頭負荷緩和
+                        staminaCost *= currentCourseId === 'basic' ? 1.12 : 1.08; // スパート時先頭負荷
                         currentSpeed *= 0.985;
                         
                         let closestDist = 999;
@@ -3063,7 +3063,7 @@
 
                 // 全体の外回りスタミナペナルティ
                 if (horse.lane > 3.0) {
-                    let staminaPenalty = currentCourseId === 'sonoda' ? 0.038 : 0.025;
+                    let staminaPenalty = currentCourseId === 'sonoda' ? 0.022 : 0.015;
                     staminaCost *= 1.0 + (horse.lane - 3.0) * staminaPenalty;
                 }
 
@@ -3231,9 +3231,18 @@
             // 通常ペース・平均的な位置で走ると60%消費 → ペース・位置補正で80-90%に
             // 短距離スプリントは全力勝負なので消費率を高く設定
             // 820m: 65%（高ペース時はバテる）/ 1400m以上: 48%
+            // 長距離ほど道中の消耗を抑えて最後まで走れるよう設計
             const targetRatio = currentSurface === 'dirt'
-                ? (total_dist <= 1000 ? 0.55 : total_dist <= 1300 ? 0.55 : 0.48)
-                : (total_dist <= 1000 ? 0.50 : total_dist <= 1300 ? 0.50 : 0.44);
+                ? (total_dist <= 1000 ? 0.55
+                 : total_dist <= 1300 ? 0.48
+                 : total_dist <= 1600 ? 0.36
+                 : total_dist <= 2000 ? 0.28
+                 : 0.24)
+                : (total_dist <= 1000 ? 0.50
+                 : total_dist <= 1300 ? 0.44
+                 : total_dist <= 1600 ? 0.32
+                 : total_dist <= 2000 ? 0.25
+                 : 0.21);
             const baseDrain = (horse.initialStamina * targetRatio) / total_dist;
 
             // 楽に走れるペース（基準速度の92%）
