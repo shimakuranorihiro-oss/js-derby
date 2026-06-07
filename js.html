@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.23</span>
+            <span class="text-sm font-bold text-gray-400">v1.24</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2532,11 +2532,10 @@
                 {
                     let positionRatio = Math.max(0.0, 1.0 - distToLeader / 45.0); // 0=後方, 1=先頭
                     if (cPace === 'high') {
-                        staminaCost *= 1.12; // ハイペース全体底上げ（基本が自動校正されているので控えめに）
-                        staminaCost *= (1.0 + 0.22 * positionRatio); // 前方追加消耗
+                        // 前にいる馬ほど消耗大（後方馬は恩恵なし）
+                        staminaCost *= (1.0 + 0.35 * positionRatio);
                     } else if (cPace === 'dainige') {
-                        staminaCost *= 1.08;
-                        staminaCost *= (1.0 + 0.18 * positionRatio);
+                        staminaCost *= (1.0 + 0.25 * positionRatio);
                     } else if (cPace === 'slow') {
                         staminaCost *= (1.0 - 0.20 * positionRatio);
                     }
@@ -3740,16 +3739,27 @@
                 let midSpeed = total_dist >= 2400 ? 0.48
                              : total_dist >= 1870 ? 0.54
                              : total_dist >= 1700 ? 0.60
-                             : 0.80;
+                             : total_dist >= 1400 ? 0.80
+                             : 0.92; // 820m・1230m：スプリント戦は速いペースで
+
+                // 短距離ほど最終直線のspeedMultiplierを上げる（820mは直線が全体の30%を占めるため）
+                let finalStraightMult = total_dist <= 1000 ? 0.28
+                                      : total_dist <= 1300 ? 0.22
+                                      : 0.18;
+
+                // 序盤スロー区間も短距離では短くする
+                let startSlowDist = Math.min(300, total_dist * 0.30);
+                let transitionEndDist = startSlowDist + Math.min(350, total_dist * 0.35);
+
                 if (remainToGoal <= finalStraightLen) {
-                    speedMultiplier = 0.18;
+                    speedMultiplier = finalStraightMult;
                 } else if (remainToGoal <= finalStraightLen + 300) {
                     let ratio = (remainToGoal - finalStraightLen) / 300;
-                    speedMultiplier = 0.18 + ((midSpeed - 0.18) * ratio);
-                } else if (currentDist < 400) {
+                    speedMultiplier = finalStraightMult + ((midSpeed - finalStraightMult) * ratio);
+                } else if (currentDist < startSlowDist) {
                     speedMultiplier = 0.45;
-                } else if (currentDist < 800) {
-                    let ratio = (currentDist - 400) / 400;
+                } else if (currentDist < transitionEndDist) {
+                    let ratio = (currentDist - startSlowDist) / (transitionEndDist - startSlowDist);
                     speedMultiplier = 0.45 + ((midSpeed - 0.45) * ratio);
                 } else {
                     speedMultiplier = midSpeed;
