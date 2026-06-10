@@ -306,7 +306,7 @@
             let r = Math.random();
             let probHigh = 0.33, probMid = 0.34, probSlow = 0.33;
 
-            if (dist <= 1400)       { probHigh = 0.70; probMid = 0.25; probSlow = 0.05; }
+            if (dist <= 1400)       { probHigh = 0.50; probMid = 0.35; probSlow = 0.15; }
             else if (dist <= 1600)  { probHigh = 0.50; probMid = 0.35; probSlow = 0.15; }
             else if (dist <= 1700)  { probHigh = 0.15; probMid = 0.50; probSlow = 0.35; } // 1700m：ハイペースは稀
             else if (dist <= 1870)  { probHigh = 0.08; probMid = 0.45; probSlow = 0.47; } // 1870m：スロー〜ミドル基調
@@ -717,8 +717,8 @@
                 if (dist === 1600) { distMin = 1400; distMax = 2000; }
                 if (dist === 3200) { distMin = 2400; distMax = 3600; }
 
-                if (type === 'nige') { maxStamina *= 1.1; spurt *= 0.9; }
-                if (type === 'oikomi') { maxStamina *= 0.9; spurt *= 1.2; }
+                if (type === 'nige') { maxStamina *= 1.1; spurt *= 0.95; }
+                if (type === 'oikomi') { maxStamina *= 0.9; spurt *= 1.1; }
 
                 const coatsList = ['bay', 'darkBay', 'chestnut', 'gray', 'white'];
                 let coat = coatsList[Math.floor(Math.random() * coatsList.length)];
@@ -786,17 +786,17 @@
 
                 let modWinRate = horse.baseWinRate;
                 
-                if (currentSurface === 'dirt' && horse.surf === 'turf') modWinRate *= 0.2; 
-                if (currentSurface === 'turf' && horse.surf === 'dirt') modWinRate *= 0.2; 
-                if (horse.surf === 'both') modWinRate *= 0.9; 
-                if (currentSurface === horse.surf) modWinRate *= 1.2;
+                if (currentSurface === 'dirt' && horse.surf === 'turf') modWinRate *= 0.2;
+                if (currentSurface === 'turf' && horse.surf === 'dirt') modWinRate *= 0.2;
+                if (horse.surf === 'both') modWinRate *= 0.9;
+                if (currentSurface === horse.surf) modWinRate *= 1.1;
 
                 if (total_dist < horse.distMin) {
-                    modWinRate *= 0.4; 
+                    modWinRate *= 0.4;
                 } else if (total_dist > horse.distMax) {
-                    modWinRate *= 0.3; 
+                    modWinRate *= 0.3;
                 } else {
-                    modWinRate *= 1.2; 
+                    modWinRate *= 1.1;
                 }
 
                 modWinRate *= horse.condition.winMod;
@@ -846,7 +846,7 @@
             if (horse.surf === 'both') { speedMod = 1.0; staminaMod = 1.0; }
 
             if (total_dist < horse.distMin) {
-                speedMod = 0.94;
+                speedMod = 0.97;
                 staminaMod = 1.1;
             } else if (total_dist > horse.distMax) {
                 // 距離オーバー：速度もスタミナも両方ペナルティ
@@ -2367,7 +2367,12 @@
                 fieldSpread *= 0.28;
             }
 
-            let spurtDist = currentCourseId === 'sonoda' ? Math.min(800, total_dist * 0.42) : Math.min(800, total_dist * 0.35);
+            let spurtDist;
+            if (currentCourseId === 'sonoda') {
+                spurtDist = total_dist === 1400 ? 600 : Math.min(800, total_dist * 0.42);
+            } else {
+                spurtDist = Math.min(800, total_dist * 0.35);
+            }
 
             if (horse.isChokusenIkki) {
                 spurtDist = currentCourseId === 'sonoda' ? 250 : 550; 
@@ -2604,7 +2609,7 @@
 
                 if (horse === currentLeader && horse.currentStamina > 0) {
                     // 風抵抗ペナルティマイルド化
-                    let windResistance = currentCourseId === 'basic' ? 1.14 : 1.10;
+                    let windResistance = currentCourseId === 'basic' ? 1.14 : 1.06;
                     staminaCost *= windResistance;
                     currentSpeed *= 0.985; 
 
@@ -2625,7 +2630,7 @@
 
             } else {
                 let distToLeader = currentLeader.run_dist - horse.run_dist;
-                let spurtMod = horse.makuriTriggered ? 1.002 : (horse.isChokusenIkki ? 1.06 : 1.0);
+                let spurtMod = horse.makuriTriggered ? (currentCourseId === 'sonoda' ? 0.91 : 1.002) : (horse.isChokusenIkki ? 1.06 : 1.0);
                 let spurtStaminaMod = horse.makuriTriggered ? 1.25 : (horse.isChokusenIkki ? 0.9 : 1.0);
                 let spurtSpeedMulti = 1.0;
                 let spurtStaminaCost = 1.0;
@@ -2651,7 +2656,7 @@
 
                 let courseSpurtMod = currentCourseId === 'basic' ? 1.12 : 0.95;
                 
-                let spStNige = 1.20, spStSenko = 1.25, spStSashi = 1.35, spStOikomi = 1.45;
+                let spStNige = 1.10, spStSenko = 1.25, spStSashi = 1.35, spStOikomi = 1.45;
                 if (currentCourseId === 'basic') {
                     spStNige = 1.28;
                     spStSenko = 1.28;
@@ -2660,11 +2665,11 @@
                 }
 
                 if (currentCourseId === 'sonoda') {
-                    // 園田：逃げ・先行の粘りを強化、差し・追込の爆発力を抑制してバランスを均等化
-                    if(horse.type === 'nige') { spurtSpeedMulti = 0.97 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
-                    else if(horse.type === 'senko') { spurtSpeedMulti = 1.09 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
-                    else if(horse.type === 'sashi') { spurtSpeedMulti = 1.09 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
-                    else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.16 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
+                    // 園田：逃げは減速なし、差し・追込の爆発力を抑制
+                    if(horse.type === 'nige') { spurtSpeedMulti = 1.01 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
+                    else if(horse.type === 'senko') { spurtSpeedMulti = 1.06 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
+                    else if(horse.type === 'sashi') { spurtSpeedMulti = 1.05 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
+                    else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.10 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
                 } else {
                     if(horse.type === 'nige') { spurtSpeedMulti = 0.92 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
                     else if(horse.type === 'senko') { spurtSpeedMulti = 1.03 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
@@ -3166,9 +3171,8 @@
                     if (horse.skillTimer > 0) maxAccelLimit *= 1.5;
                     if (inStartDash) maxAccelLimit = Math.max(maxAccelLimit, 0.045);
 
-                    // 位置取りミスマッチペナルティ
-                    // 脚質の自然なポジションから大きくズレていると加速しにくい
-                    if (!inStartDash && !horse.makuriTriggered) {
+                    // 位置取りミスマッチペナルティ（シミュレーション時は無効：currentRankingが別レースのため誤作動する）
+                    if (!isSim && !inStartDash && !horse.makuriTriggered) {
                         const naturalRankRatio = {
                             'nige':   0.08,   // 上位8%（先頭付近）
                             'senko':  0.28,   // 上位28%
@@ -3430,14 +3434,14 @@
                 horse.simConditionStatMod = cond.statMod;
                 
                 let modWinRate = horse.baseWinRate;
-                if (currentSurface === 'dirt' && horse.surf === 'turf') modWinRate *= 0.2; 
-                if (currentSurface === 'turf' && horse.surf === 'dirt') modWinRate *= 0.2; 
-                if (horse.surf === 'both') modWinRate *= 0.9; 
-                if (currentSurface === horse.surf) modWinRate *= 1.2;
+                if (currentSurface === 'dirt' && horse.surf === 'turf') modWinRate *= 0.2;
+                if (currentSurface === 'turf' && horse.surf === 'dirt') modWinRate *= 0.2;
+                if (horse.surf === 'both') modWinRate *= 0.9;
+                if (currentSurface === horse.surf) modWinRate *= 1.1;
 
-                if (total_dist < horse.distMin) modWinRate *= 0.4; 
-                else if (total_dist > horse.distMax) modWinRate *= 0.3; 
-                else modWinRate *= 1.2; 
+                if (total_dist < horse.distMin) modWinRate *= 0.4;
+                else if (total_dist > horse.distMax) modWinRate *= 0.3;
+                else modWinRate *= 1.1; 
 
                 modWinRate *= cond.winMod;
                 horse.tmpWinRate = Math.max(0.001, modWinRate); 
@@ -3545,12 +3549,10 @@
             const paceLabels = { dainige: '大逃げ', high: 'ハイペース', middle: 'ミドルペース', slow: 'スローペース' };
             const typeNames4 = { nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追込' };
             let paceCounts = { dainige: 0, high: 0, middle: 0, slow: 0 };
-            let paceWinnerType = {
-                dainige: { nige:0, senko:0, sashi:0, oikomi:0 },
-                high:    { nige:0, senko:0, sashi:0, oikomi:0 },
-                middle:  { nige:0, senko:0, sashi:0, oikomi:0 },
-                slow:    { nige:0, senko:0, sashi:0, oikomi:0 }
-            };
+            const emptyType = () => ({ nige:0, senko:0, sashi:0, oikomi:0 });
+            let paceWinnerType  = { dainige: emptyType(), high: emptyType(), middle: emptyType(), slow: emptyType() };
+            let paceSecondType  = { dainige: emptyType(), high: emptyType(), middle: emptyType(), slow: emptyType() };
+            let paceThirdType   = { dainige: emptyType(), high: emptyType(), middle: emptyType(), slow: emptyType() };
 
             const totalSims = 1000;
             let currentSim = 0;
@@ -3565,9 +3567,11 @@
                         if (top[1]) placeCounts[top[1].name]++;
                         if (top[2]) showCounts[top[2].name]++;
                         const pace = sim.pace || 'middle';
-                        if (paceCounts[pace] !== undefined) paceCounts[pace]++;
-                        if (top[0] && paceWinnerType[pace]) {
-                            paceWinnerType[pace][top[0].type]++;
+                        if (paceCounts[pace] !== undefined) {
+                            paceCounts[pace]++;
+                            if (top[0]) paceWinnerType[pace][top[0].type]++;
+                            if (top[1]) paceSecondType[pace][top[1].type]++;
+                            if (top[2]) paceThirdType[pace][top[2].type]++;
                         }
                     }
                     currentSim++;
@@ -3577,7 +3581,7 @@
                     simBtn.innerHTML = `⏳ ${currentSim} / ${totalSims} 計算中...`;
                     setTimeout(runBatch, 0); 
                 } else {
-                    showSimResult(winCounts, placeCounts, showCounts, paceCounts, paceWinnerType, paceLabels, typeNames4, totalSims);
+                    showSimResult(winCounts, placeCounts, showCounts, paceCounts, paceWinnerType, paceSecondType, paceThirdType, paceLabels, typeNames4, totalSims);
                     simBtn.innerHTML = originalText;
                     simBtn.disabled = false;
                     startBtn.disabled = false;
@@ -3587,7 +3591,7 @@
             setTimeout(runBatch, 10);
         });
 
-        function showSimResult(winCounts, placeCounts, showCounts, paceCounts, paceWinnerType, paceLabels, typeNames4, total) {
+        function showSimResult(winCounts, placeCounts, showCounts, paceCounts, paceWinnerType, paceSecondType, paceThirdType, paceLabels, typeNames4, total) {
             const tbody = document.getElementById('simResultTableBody');
             tbody.innerHTML = '';
 
@@ -3634,19 +3638,23 @@
                 const cnt = paceCounts[pk] || 0;
                 if (cnt === 0) return;
                 const pct = (cnt / total * 100).toFixed(1);
-                const wt  = paceWinnerType[pk];
-                const typeTotal = Object.values(wt).reduce((a,b) => a+b, 0);
-                let typeBars = Object.entries(wt).map(([type, n]) => {
-                    if (n === 0) return '';
-                    const tp = typeTotal > 0 ? (n/typeTotal*100).toFixed(0) : 0;
-                    const colors = {nige:'bg-red-400',senko:'bg-orange-400',sashi:'bg-blue-400',oikomi:'bg-purple-400'};
-                    return `<span class="inline-flex items-center mr-2 text-xs"><span class="inline-block w-2 h-2 rounded-full ${colors[type]||'bg-gray-400'} mr-1"></span>${typeNames4[type]} ${tp}%</span>`;
-                }).join('');
-
                 const paceColor = {dainige:'border-fuchsia-400 bg-fuchsia-50',high:'border-red-400 bg-red-50',middle:'border-yellow-400 bg-yellow-50',slow:'border-blue-400 bg-blue-50'}[pk] || 'border-gray-300 bg-gray-50';
+                const colors = {nige:'bg-red-400',senko:'bg-orange-400',sashi:'bg-blue-400',oikomi:'bg-purple-400'};
+
+                const makeTypeBars = (typeObj) => {
+                    const tot = Object.values(typeObj).reduce((a,b)=>a+b, 0);
+                    return Object.entries(typeObj).map(([type, n]) => {
+                        if (n === 0) return '';
+                        const tp = tot > 0 ? (n/tot*100).toFixed(0) : 0;
+                        return `<span class="inline-flex items-center mr-2"><span class="inline-block w-2 h-2 rounded-full ${colors[type]||'bg-gray-400'} mr-1"></span>${typeNames4[type]} ${tp}%</span>`;
+                    }).join('');
+                };
+
                 paceHtml += `<div class="rounded-lg border-2 ${paceColor} p-3">
                     <div class="font-bold text-gray-800">${paceLabels[pk]} <span class="text-gray-500 font-normal text-sm">${cnt}回 (${pct}%)</span></div>
-                    <div class="mt-1 text-xs text-gray-600">1着脚質: ${typeBars || '―'}</div>
+                    <div class="mt-1 text-xs text-gray-600">1着: ${makeTypeBars(paceWinnerType[pk]) || '―'}</div>
+                    <div class="mt-0.5 text-xs text-gray-500">2着: ${makeTypeBars(paceSecondType[pk]) || '―'}</div>
+                    <div class="mt-0.5 text-xs text-gray-500">3着: ${makeTypeBars(paceThirdType[pk]) || '―'}</div>
                 </div>`;
             });
 
