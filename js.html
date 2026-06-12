@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.1</span>
+            <span class="text-sm font-bold text-gray-400">v1.35</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2472,9 +2472,9 @@
                         highSeverity = Math.max(0.38, 1.0 - (total_dist - 1400) * 0.0006);
                     }
                     // 余剰消費分（1.0を超える部分）だけを距離で割り引く
-                    if (horse.type === 'nige')       paceStaminaMod = 1.0 + 0.42 * highSeverity;
-                    else if (horse.type === 'senko') paceStaminaMod = 1.0 + 0.28 * highSeverity;
-                    else                              paceStaminaMod = 1.0 + 0.04 * highSeverity;
+                    if (horse.type === 'nige')       paceStaminaMod = 1.0 + 0.62 * highSeverity;
+                    else if (horse.type === 'senko') paceStaminaMod = 1.0 + 0.42 * highSeverity;
+                    else                              paceStaminaMod = 1.0 + 0.10 * highSeverity;
                 }
                 else if (cPace === 'slow') { paceSpeedMod = 0.96; paceStaminaMod = 0.85; }
                 else if (cPace === 'dainige') {
@@ -2696,7 +2696,7 @@
 
                     // スタミナが「45」を切ると、0に向かってジワジワとスピードが低下する
                     // 芝：下限0.70 / ダート：下限0.62（ダートは消耗戦＝バテるとより止まる）
-                    const fadeFloor = currentSurface === 'dirt' ? 0.66 : 0.74;
+                    const fadeFloor = currentSurface === 'dirt' ? 0.60 : 0.68;
                     if (horse.currentStamina < 42) {
                         let t = horse.currentStamina / 42; // 1.0 (残42) -> 0.0 (残0)
                         // カーブを少し効かせ、残量が減るほど加速度的に垂れる
@@ -2853,7 +2853,22 @@
 
             targetLane = horse.lane;
             if (Math.abs(horse.lane - baseTargetLane) > 0.3) {
-                targetLane = horse.lane + (baseTargetLane - horse.lane) * 0.08; 
+                // 前後約1馬身（run_distで9.5未満）以内に他馬がいる場合は、
+                // 接触・幅寄せのような不自然な横移動を避けるためレーン変更を保留する。
+                const ONE_HORSE_LENGTH = 9.5;
+                let hasCloseHorse = false;
+                for (let other of allHorses) {
+                    if (other === horse) continue;
+                    if (Math.abs(other.run_dist - horse.run_dist) < ONE_HORSE_LENGTH) {
+                        hasCloseHorse = true;
+                        break;
+                    }
+                }
+                // ブロックされて避ける必要がある場合（blocker確定後）は別途処理されるため、
+                // ここでは「目標レーンへのゆっくりとした追従」のみを抑制する。
+                if (!hasCloseHorse) {
+                    targetLane = horse.lane + (baseTargetLane - horse.lane) * 0.08;
+                }
             }
 
             // 3コーナー〜4コーナーの間はお互いの隙間をギュッと狭めて（0.55）走ることで、外への大膨らみを防いで一団の馬群を保つ
