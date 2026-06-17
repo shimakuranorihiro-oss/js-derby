@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.35</span>
+            <span class="text-sm font-bold text-gray-400">v1.93</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -100,6 +100,10 @@
             <button id="nextBtn" class="bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white font-bold py-3 px-10 rounded-full text-lg md:text-xl shadow-lg transition-transform transform hover:scale-105">
                 次のレースへ（出走馬抽選）
             </button>
+            <button id="copyRaceBtn" class="mt-3 bg-gradient-to-r from-indigo-400 to-purple-500 hover:from-indigo-500 hover:to-purple-600 text-white font-bold py-2 px-8 rounded-full text-base shadow-md transition-transform transform hover:scale-105 block mx-auto">
+                📋 レース内容をコピー → Claudeに改善依頼
+            </button>
+            <div id="copyRaceMsg" class="mt-2 hidden text-sm text-indigo-700 font-bold"></div>
             <p id="bankruptMsg" class="text-red-500 font-bold mt-4 hidden">破産しました... ページを更新して最初からやり直してください。</p>
         </div>
 
@@ -119,6 +123,8 @@
                             <th scope="col" class="px-4 py-3 border-b text-right">設定勝率</th>
                             <th scope="col" class="px-4 py-3 border-b text-right text-purple-600 font-bold">シミュ勝率</th>
                             <th scope="col" class="px-4 py-3 border-b text-right font-bold">1着回数</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right font-bold">2着回数</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right font-bold">3着回数</th>
                         </tr>
                     </thead>
                     <tbody id="simResultTableBody">
@@ -126,9 +132,34 @@
                     </tbody>
                 </table>
             </div>
+
+            <h3 class="text-lg md:text-xl font-bold mt-6 mb-2 text-purple-700">📈 ペース別 1-3着の脚質傾向 & 平均勝ちタイム</h3>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="w-full text-sm text-left text-gray-600 border-collapse">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 border-b">ペース</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right">該当レース数</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right">逃げ</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right">先行</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right">差し</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right">追込</th>
+                            <th scope="col" class="px-4 py-3 border-b text-right">平均勝ちタイム</th>
+                        </tr>
+                    </thead>
+                    <tbody id="simPaceTableBody">
+                        <!-- JSで生成 -->
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-400 mt-2 text-left">※「逃げ/先行/差し/追込」は各レースの1〜3着馬の脚質を集計したもの（1レースにつき最大3つ）。割合(%)は (該当脚質の回数) ÷ (該当レース数×3) で算出。</p>
             <button id="closeSimBtn" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-10 rounded-full text-lg shadow-md transition-transform transform hover:scale-105">
                 閉じる
             </button>
+            <button id="copySimBtn" class="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-2 px-8 rounded-full text-lg shadow-md transition-transform transform hover:scale-105 ml-3">
+                📋 結果をコピー → Claudeに分析依頼
+            </button>
+            <div id="copySimMsg" class="mt-2 hidden text-sm text-indigo-700 font-bold"></div>
         </div>
         
         <!-- 馬券購入パネル -->
@@ -156,6 +187,9 @@
                 </div>
                 
                 <div class="flex flex-col sm:flex-row w-full md:w-auto gap-3">
+                    <button id="globalSim50kBtn" class="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-4 rounded-lg text-sm md:text-base transition-all shadow-md transform hover:-translate-y-1 whitespace-nowrap">
+                        💾 5万回全馬シミュ
+                    </button>
                     <button id="globalSimBtn" class="w-full sm:w-auto bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-bold py-3 px-4 rounded-lg text-sm md:text-base transition-all shadow-md transform hover:-translate-y-1 whitespace-nowrap">
                         💾 1万回全馬シミュ
                     </button>
@@ -295,23 +329,24 @@
         function determinePace(raceHorses, dist) {
             let nigeHorses = raceHorses.filter(h => h.type === 'nige');
             let nigeCount = nigeHorses.length;
-            let hasDaiNige = nigeHorses.some(h => h.skillName === '逆噴射の大逃げ' || h.skillName === '異次元の逃亡者' || h.speedBase >= 1.4);
+            let hasDaiNige = nigeHorses.some(h => h.skillName === '逆噴射の大逃げ' || h.skillName === '異次元の逃亡者' || h.speedBase >= 1.48);
             
-            if (hasDaiNige && Math.random() < 0.25) return 'dainige'; 
+            if (hasDaiNige && Math.random() < (dist >= 1700 ? 0.05 : 0.20)) return 'dainige'; 
 
             let r = Math.random();
             let probHigh = 0.33, probMid = 0.34, probSlow = 0.33;
 
-            if (dist <= 1600)       { probHigh = 0.70; probMid = 0.25; probSlow = 0.05; }
-            else if (dist <= 1700)  { probHigh = 0.30; probMid = 0.48; probSlow = 0.22; } // 1700m：中距離、やや落ち着く
-            else if (dist <= 1870)  { probHigh = 0.20; probMid = 0.48; probSlow = 0.32; } // 1870m：中距離、スローが増える
-            else if (dist <= 2400)  { probHigh = 0.12; probMid = 0.40; probSlow = 0.48; } // 2400m：長距離、スロー基調
-            else if (dist >= 3000)  { probHigh = 0.05; probMid = 0.25; probSlow = 0.70; }
+            if (dist <= 1600)       { probHigh = 0.52; probMid = 0.33; probSlow = 0.15; }
+            else if (dist <= 2000)  { probHigh = 0.25; probMid = 0.50; probSlow = 0.25; } // 中距離：ハイ25/ミドル50/スロー25
+            else if (dist <= 2400)  { probHigh = 0.22; probMid = 0.48; probSlow = 0.30; } // 長距離：ややスロー寄り
+            else if (dist >= 3000)  { probHigh = 0.10; probMid = 0.40; probSlow = 0.50; }
             else                    { probHigh = 0.25; probMid = 0.50; probSlow = 0.25; }
 
-            if (hasDaiNige) { probHigh += 0.35; probSlow -= 0.15; }
+            // 逃げ馬の数による補正（中長距離ではハイペース化を抑える）
+            const nigeBoostScale = dist >= 1700 ? 0.4 : 1.0;
+            if (hasDaiNige) { probHigh += 0.35 * nigeBoostScale; probSlow -= 0.15 * nigeBoostScale; }
             if (nigeCount === 0) { probSlow += 0.35; probHigh -= 0.15; } 
-            else if (nigeCount >= 3) { probHigh += 0.25; probSlow -= 0.10; }
+            else if (nigeCount >= 3) { probHigh += 0.25 * nigeBoostScale; probSlow -= 0.10 * nigeBoostScale; }
 
             let total = Math.max(0.01, probHigh) + Math.max(0.01, probMid) + Math.max(0.01, probSlow);
             probHigh = Math.max(0.01, probHigh) / total;
@@ -366,7 +401,8 @@
             }
             // JRA：1700m=105秒(1:45.0) を基点に、約0.077秒/m で増減。
             // 中長距離をより時計のかかる設定に（1870→約118.1 / 2000→約128.1 / 2400→約158.9）。
-            return 105 + (dist - 1700) * 0.077;
+            // JRA：1700m=105秒(1:45.0)基点、傾き0.0686で 1870→約116.7(1:56.7) / 2400→約153.0(2:33.0)
+            return 105 + (dist - 1700) * 0.0686;
         }
 
         // 秒数を「M:SS.s」または「SS.s」形式に整形
@@ -575,7 +611,7 @@
             ['ナチュラリー', 'nige', 'dirt', 1400, 'A', 'スプリントの星'],
             ['ノブタイザン', 'sashi', 'dirt', 1870, 'A', '重賞制覇'],
             ['ビーボタンダッシュ', 'oikomi', 'dirt', 1400, 'B', '追い込み'],
-            ['マジックカーペット', 'sashi', 'dirt', 1870, 'A', 'ダービー馬'],
+            ['マジックカーペット', 'sashi', 'dirt', 1870, 'S', 'ダービー馬'],
             ['ヨシノファルコン', 'nige', 'dirt', 1400, 'A', '快速'],
             ['ララメダイユドール', 'sashi', 'dirt', 1870, 'B', '差し脚'],
             ['リッカルド', 'senko', 'dirt', 1870, 'A', '南関東の雄'],
@@ -694,6 +730,21 @@
                 maxStamina *= (0.95 + Math.random() * 0.10);
                 spurt *= (0.95 + Math.random() * 0.10);
                 baseWinRate *= (0.8 + Math.random() * 0.4);
+
+                // 個別調整：シミュレーションで設定勝率を大幅に超える傾向がある馬を抑制
+                const winRateOverride = {
+                    'オグリキャップ': 0.075,
+                    'オオエライジン': 0.045,  // シミュで強すぎるため抑制
+                    'イグナイター':   0.082,
+                    'マジックカーペット': 0.14,
+                    'アウォーディー': 0.092,  // 14.3%設定→28.4%シミュのため抑制
+                    'バズーカ':       0.042,  // 5.8%設定→12.2%シミュのため抑制
+                    'リュウノユキナ': 0.082,  // 11.6%設定→28.5%シミュのため抑制
+                    'ダノンレジェンド': 0.140, // 19.8%設定→27.4%シミュのため微調整
+                };
+                if (winRateOverride[name] !== undefined) {
+                    baseWinRate = winRateOverride[name] * (0.85 + Math.random() * 0.30);
+                }
 
                 let distMin = dist - 400;
                 let distMax = dist + 400;
@@ -831,8 +882,9 @@
             if (horse.surf === 'both') { speedMod = 1.0; staminaMod = 1.0; }
 
             if (total_dist < horse.distMin) {
-                speedMod = 0.94;
-                staminaMod = 1.1;
+                let under = Math.min((horse.distMin - total_dist) / 400, 1.0);
+                speedMod = 0.94 - under * 0.04;   // 最大0.90倍まで低下
+                staminaMod = 0.96 - under * 0.10; // 最大0.86倍まで低下（距離が長い馬は短距離で脚を持続させにくい）
             } else if (total_dist > horse.distMax) {
                 // 距離オーバー：速度もスタミナも両方ペナルティ
                 let over = Math.min((total_dist - horse.distMax) / 400, 1.0);
@@ -915,6 +967,8 @@
         const betPanel = document.getElementById('betPanel');
         const resultPanel = document.getElementById('resultPanel');
         const simResultPanel = document.getElementById('simResultPanel');
+        let lastSimData = null; // AI分析用にシミュ結果を保持
+        let lastRaceData = null; // レース内容コピー用
         const horseOptionsContainer = document.getElementById('horseOptions');
         const cameraToggleBtn = document.getElementById('cameraToggleBtn');
         const aiPredictionBtn = document.getElementById('aiPredictionBtn');
@@ -2120,9 +2174,8 @@
                 ctx.fillText(horse.horseNum, pos.x, markerY);
 
                 if (horse.isSweating && isRacing) {
-                    let sweatCount = Math.min(3, Math.floor((horse.exhaustion || 0) / 30) + 1); 
                     ctx.font = '10px sans-serif';
-                    ctx.fillText('💦'.repeat(sweatCount), pos.x + 8, markerY - 4);
+                    ctx.fillText('💦', pos.x + 8, markerY - 4);
                 } else if (horse.isBattling && isRacing) {
                     ctx.font = '10px sans-serif';
                     ctx.fillText('🔥', pos.x + 8, markerY - 4);
@@ -2335,14 +2388,18 @@
             horse.blocked = false;
             horse.isBattling = false; 
 
-            // 長距離でも馬群が広がりすぎないよう上限を設ける
-            let fieldSpread = Math.max(1.0, Math.min(1.25, total_dist / 2000));
+            // 長距離でも馬群が広がりすぎないよう上限を設ける（2400m以上は特に密集を維持）
+            let fieldSpread = total_dist >= 2200
+                ? Math.max(0.7, Math.min(0.9, total_dist / 2000))   // 2400m：コンパクトに
+                : Math.max(1.0, Math.min(1.15, total_dist / 2000));  // 短中距離：従来通り
             if (cPace === 'high') {
-                fieldSpread *= 2.2; 
+                fieldSpread *= 1.1;  // ハイ：ばらけすぎないよう抑制（旧1.5）
             } else if (cPace === 'slow') {
-                fieldSpread *= 0.6; 
+                fieldSpread *= 0.35; // スロー：さらに密集（旧0.45）
             } else if (cPace === 'dainige') {
-                fieldSpread *= 3.5; 
+                fieldSpread *= 1.8;  // 大逃げ：先頭は離れるが後続は詰まる（旧2.2）
+            } else {
+                fieldSpread *= 0.80; // ミドル：やや詰まる
             }
 
             if (currentCourseId === 'basic') {
@@ -2417,13 +2474,24 @@
                     let shouldMakuri = false;
                     
                     if (cPace === 'high') {
-                        // ハイペース時は無理なまくりを大きく制限
-                        if (staminaRatio > 0.85) { executeProb *= 0.1; shouldMakuri = true; }
+                        // ハイペース：前にいる逃げ・先行はまくる余力がない。差し・追込も残90%以上でのみ
+                        if (horse.type === 'nige' || horse.type === 'senko') {
+                            shouldMakuri = false; // 前の馬はまくり封止
+                        } else if (staminaRatio > 0.90) {
+                            executeProb *= 0.06; shouldMakuri = true;
+                        }
+                    } else if (cPace === 'dainige') {
+                        // 大逃げも同様：前の馬はまくりなし
+                        if (horse.type === 'nige' || horse.type === 'senko') {
+                            shouldMakuri = false;
+                        } else if (staminaRatio > 0.85) {
+                            executeProb *= 0.08; shouldMakuri = true;
+                        }
                     } else if (cPace === 'slow') {
-                        if (staminaRatio > 0.40) { executeProb *= 3.0; shouldMakuri = true; }
+                        if (staminaRatio > 0.72) { executeProb *= 1.1; shouldMakuri = true; }
                     } else {
-                        if (staminaRatio > 0.65) {
-                            executeProb *= (cPace === 'dainige' ? 1.2 : 0.8);
+                        if (staminaRatio > 0.72) {
+                            executeProb *= (cPace === 'dainige' ? 0.8 : 0.5);
                             shouldMakuri = true;
                         }
                     }
@@ -2440,7 +2508,7 @@
             }
 
             let personalDistOffset = ((horse.horseNum * 3.7) % 10) - 5.0; // 個体差を縮小
-            targetDistMax = 13 + personalDistOffset; // 先頭との目標距離を短縮
+            targetDistMax = (13 + personalDistOffset) * fieldSpread; // fieldSpreadをtargetDistMaxに反映
 
             // 3コーナー（スパート手前250m、園田はコースが小さいため150m）の進入距離を定義
             let threeCornerDist = spurtDist + (currentCourseId === 'sonoda' ? 200 : 250);
@@ -2464,26 +2532,65 @@
                     paceSpeedMod = 1.04;
                     // ハイペースの厳しさは距離で変わる：短距離は前半から脚を使い切ってバテる。
                     // 中長距離は前半飛ばしても勝負所まで脚を溜められる＝消耗は緩和。
-                    // 1400m以下:1.0倍 / 1700m:0.72 / 2000m:0.55 / 2400m:0.40 まで逓減
+                    // 1400m以下:1.0倍 / 中長距離も下限0.70までしか緩めない（消耗戦を維持）
                     let highSeverity;
                     if (total_dist <= 1400) {
-                        highSeverity = 1.0;
+                        // 短距離はスプリント戦＝中長距離ほど前が極端に消耗しない
+                        highSeverity = 0.68;
                     } else {
-                        highSeverity = Math.max(0.38, 1.0 - (total_dist - 1400) * 0.0006);
+                        highSeverity = Math.max(0.70, 1.0 - (total_dist - 1400) * 0.0003);
                     }
                     // 余剰消費分（1.0を超える部分）だけを距離で割り引く
-                    if (horse.type === 'nige')       paceStaminaMod = 1.0 + 0.62 * highSeverity;
-                    else if (horse.type === 'senko') paceStaminaMod = 1.0 + 0.42 * highSeverity;
-                    else                              paceStaminaMod = 1.0 + 0.10 * highSeverity;
+                    if (horse.type === 'nige')       paceStaminaMod = 1.0 + 0.54 * highSeverity;
+                    else if (horse.type === 'senko') paceStaminaMod = 1.0 + 0.48 * highSeverity;
+                    else                              paceStaminaMod = 1.0 + 0.14 * highSeverity;
+
+                    // ハイペースは前にいる馬ほど消耗が大きく、後ろにいる馬ほど楽になる。
+                    // 先頭からの距離(distToLeader)に応じて消費係数を補正する。
+                    // 先頭(dist=0)→補正なし / 離れるほど消費軽減（最大45%軽減）
+                    {
+                        const distToLeader = currentLeader ? Math.max(0, currentLeader.run_dist - horse.run_dist) : 0;
+                        const posRelief = Math.min(0.45, distToLeader * 0.010);
+                        paceStaminaMod = 1.0 + (paceStaminaMod - 1.0) * (1.0 - posRelief);
+
+                        // 前にいる馬はレース後半ほど脚にこたえる（飛ばした分のツケが回る）。
+                        let raceProgress = Math.min(1.0, horse.run_dist / total_dist);
+                        let frontExtra = (1.0 - Math.min(1.0, distToLeader * 0.012)); // 先頭1.0→離れると0
+                        // 距離が長いほど前で飛ばしたツケが大きい（中長距離はスタミナ勝負）
+                        // ただし2400mは既に全体的な消耗が大きいので過剰にしない
+                        let distScale = total_dist >= 2200 ? 1.1 : (total_dist >= 1700 ? 1.5 : 1.0);
+                        let lateRacePenalty = Math.max(0, raceProgress - 0.40) * 1.5 * distScale; // 中盤以降に強く効く
+                        paceStaminaMod *= (1.0 + frontExtra * lateRacePenalty);
+                    }
                 }
-                else if (cPace === 'slow') { paceSpeedMod = 0.96; paceStaminaMod = 0.85; }
+                else if (cPace === 'slow') {
+                    paceSpeedMod = 0.96; paceStaminaMod = 0.68; // スローはほぼ脚が削られない（消耗少）
+                    // スローペースは「ハナを切って脚を溜める」展開。逃げ馬、特に先頭は道中の消耗をさらに抑える。
+                    if (horse.type === 'nige') {
+                        paceStaminaMod *= (horse === currentLeader) ? 0.25 : 0.50;
+                    } else if (horse.type === 'senko') {
+                        paceStaminaMod *= 0.85;
+                    }
+                }
+                else if (cPace === 'middle') {
+                    paceSpeedMod = 1.0; paceStaminaMod = 0.92; // ミドルは中間的な消耗
+                    if (horse.type === 'senko') paceStaminaMod = 1.02; // 先行はミドルでも少し消耗
+                }
                 else if (cPace === 'dainige') {
+                    // 大逃げもハイペースと同じ距離別severity
+                    const dainigeHighSeverity = total_dist <= 1400
+                        ? 0.68
+                        : Math.max(0.70, 1.0 - (total_dist - 1400) * 0.0003);
                     if (horse === currentLeader) {
-                        // 1頭だけ突出して飛ばす＝道中から激しく消耗
-                        paceSpeedMod = 1.09; paceStaminaMod = 1.55;
+                        // 大逃げ馬は速く飛ばす分、ハイペース並みの消耗（位置補正は先頭なので0）
+                        paceSpeedMod = 1.09; paceStaminaMod = 1.0 + 0.62 * dainigeHighSeverity;
                     } else {
-                        // 後続は離れた相手を無理に追わず、自分のペースで運べる（ミドル〜ややスロー）
-                        paceSpeedMod = 0.97; paceStaminaMod = 0.92;
+                        // 後続はハイペースと同じ位置別消費（大逃げでも離れすぎると楽にならない）
+                        paceSpeedMod = 1.02; paceStaminaMod = 1.0 + 0.50 * dainigeHighSeverity;
+                        // ハイペースと同じ：先頭から離れるほど消費軽減
+                        const distToLeader = currentLeader ? Math.max(0, currentLeader.run_dist - horse.run_dist) : 0;
+                        const posRelief = Math.min(0.45, distToLeader * 0.010);
+                        paceStaminaMod = 1.0 + (paceStaminaMod - 1.0) * (1.0 - posRelief);
                     }
                 }
             }
@@ -2491,6 +2598,16 @@
             if (remainToGoal > spurtDist) {
                 currentSpeed *= paceSpeedMod;
                 staminaCost *= paceStaminaMod;
+
+                // 勝負所手前のペースダウン：スパート開始地点の手前で隊列が一息つく。
+                // 区間を広げ(550m)、緩みも強めて中盤のラップが速くなりすぎないようにする。
+                let lullStart = spurtDist + 550;
+                if (remainToGoal <= lullStart && remainToGoal > spurtDist) {
+                    let lullPhase = (remainToGoal - spurtDist) / 550; // 1.0(緩み始め)→0.0(スパート直前)
+                    let lullAmount = Math.sin(lullPhase * Math.PI) * 0.11; // 最大11%減速
+                    currentSpeed *= (1.0 - lullAmount);
+                    staminaCost *= (1.0 - lullAmount * 0.5); // 緩む分スタミナも少し回復気味に温存
+                }
 
                 // ペース確定前（実走）：出走馬構成から生まれた前半の流れを前で運ぶ脚質に反映。
                 // 速い流れを作る逃げ・先行ほど脚を使う＝終盤の前崩れの素地になる。
@@ -2528,23 +2645,50 @@
                     staminaCost *= (1.0 + 0.50 * posFactor); // ハイペース時、前方ほど脚を使い終盤に垂れる
                 }
 
-                if (horse.makuriTriggered && cPace === 'high') {
-                    staminaCost *= 1.20; // まくりスタミナ負荷軽減
+                if (horse.makuriTriggered) {
+                    // まくりは脚を使う。特に先頭に立つと風圧で消耗が激しい
+                    staminaCost *= (cPace === 'high' || cPace === 'dainige') ? 1.45 : 1.30;
+                    if (horse === currentLeader) {
+                        staminaCost *= 1.18; // まくって先頭に立った馬はさらに消耗（押し切りを防ぐ）
+                    }
+                }
+
+                // ==========================================
+                // 道中でもスタミナ切れの影響を速度に反映する（グラデーション失速）
+                // これまでは直線(spurt区間)のみに失速が掛かっていたため、
+                // 道中でスタミナを使い切っていても直線手前まで全く減速しなかった。
+                // ==========================================
+                if (horse.currentStamina < 52) {
+                    let t = Math.max(0, horse.currentStamina) / 52; // 1.0 (残52) -> 0.0 (残0)
+                    // バテたらしっかり減速する（下限を下げて消耗の影響を明確に）
+                    const midRaceFadeFloor = currentSurface === 'dirt' ? 0.76 : 0.82;
+                    let eased = t * t * 0.4 + t * 0.6;
+                    let midRaceFade = midRaceFadeFloor + (1.0 - midRaceFadeFloor) * eased;
+                    currentSpeed *= midRaceFade;
                 }
 
                 if (distToLeader > targetDistMax) {
-                    let catchUpRate = currentCourseId === 'basic' ? 0.0050 : 0.0030;
+                    // 長距離ほどcatchUpを強めて馬群を維持（2400mで後方が大差になるのを防ぐ）
+                    let catchUpRate = total_dist >= 2200
+                        ? (currentCourseId === 'basic' ? 0.0095 : 0.0070)
+                        : (currentCourseId === 'basic' ? 0.0080 : 0.0060);
+                    // 先頭が逃げ馬の場合、道中は後続が追いつきにくい（逃げ馬が自分のペースで走れる）
+                    if (currentLeader && currentLeader.type === 'nige' && horse !== currentLeader) {
+                        catchUpRate *= 0.72;
+                    }
                     
-                    // 3コーナー進入からスパート位置までの間、追いつき反応（catchUpRate）を1.5倍に強化して、綺麗に距離を詰めさせる
+                    // 3コーナー進入からスパート位置までの間、追いつき反応をさらに強化
                     if (remainToGoal < threeCornerDist && remainToGoal > spurtDist) {
-                        catchUpRate *= 1.5;
+                        catchUpRate *= 1.8;
                     }
 
-                    let catchUpFactor = 1.0 + (distToLeader - targetDistMax) * catchUpRate;
+                    // 遠いほど強く引き戻される二乗成分を追加（馬群のゴム紐効果）
+                    let gap = distToLeader - targetDistMax;
+                    let catchUpFactor = 1.0 + gap * catchUpRate + gap * gap * 0.00008;
                     
                     // 捲りの最大速度上限を厳格に「1.10倍」に固定
-                    let maxCatchUp = 1.10; 
-                    let minCatchUp = 1.02;
+                    let maxCatchUp = 1.14; 
+                    let minCatchUp = 1.0; // 目標距離内にいる馬は余計に加速しない
                     
                     if (horse.makuriTriggered) {
                         if (horse.makuriProgress === undefined) horse.makuriProgress = 0;
@@ -2555,7 +2699,7 @@
                         let progress = Math.min(1.0, horse.makuriProgress);
 
                         let maxBonus = currentCourseId === 'sonoda' ? 0.003 : 0.010;
-                        let catchUpFactorBase = currentCourseId === 'sonoda' ? 0.00003 : 0.00012;
+                        let catchUpFactorBase = currentCourseId === 'sonoda' ? 0.00002 : 0.00008;
 
                         catchUpFactor = 1.0 + (distToLeader - targetDistMax) * catchUpFactorBase * Math.pow(progress, 1.5);
 
@@ -2564,28 +2708,37 @@
                             catchUpFactor = 1.0 + (catchUpFactor - 1.0) * damp;
                         }
 
-                        catchUpFactor = Math.min(1.07, catchUpFactor); // まくりの最大倍率を1.07倍に制限
-                        maxCatchUp = 1.07;
-                        minCatchUp = 1.00 + (0.02 * progress); 
+                        catchUpFactor = Math.min(1.04, catchUpFactor); // まくりの最大倍率を1.04倍に制限
+                        maxCatchUp = 1.04;
+                        minCatchUp = 1.00 + (0.015 * progress); 
                     }
                     currentSpeed *= Math.min(maxCatchUp, Math.max(minCatchUp, catchUpFactor)); 
                     
-                    // 後方から追い上げ中：脚質による差のみ（ポジションペナルティなし）
-                    staminaCost *= 0.95; // 後方馬は道中省エネ
+                    // 後方から追い上げ中：まくり中は脚を使うので直線で苦しくなる
+                    if (horse.makuriTriggered) {
+                        staminaCost *= 1.35; // まくりは脚を使う＝直線で伸びを欠く
+                    } else {
+                        staminaCost *= 0.95; // 通常の後方馬は道中省エネ
+                    }
                 } else if (distToLeader < targetDistMin) {
                     let slowDown = (currentCourseId === 'sonoda' && horse.makuriTriggered) ? 0.90 : 0.95;
                     currentSpeed *= slowDown; 
                     staminaCost *= 0.9;
                 }
                 
-                if(horse.type === 'nige') { currentSpeed *= 1.03; }
+                if(horse.type === 'nige') { currentSpeed *= 1.07; }
                 else if(horse.type === 'senko') { currentSpeed *= 1.01; }
                 else if(horse.type === 'sashi') { currentSpeed *= 0.99; }
                 else if(horse.type === 'oikomi') { currentSpeed *= 0.98; }
 
                 if (horse === currentLeader && horse.currentStamina > 0) {
-                    // 風抵抗ペナルティマイルド化
-                    let windResistance = currentCourseId === 'basic' ? 1.30 : 1.22; 
+                    // 風抵抗ペナルティ。ハイペース時は位置別消費と二重になるため軽めにする。
+                    let windResistance;
+                    if (cPace === 'high' || cPace === 'dainige') {
+                        windResistance = currentCourseId === 'basic' ? 1.08 : 1.05;
+                    } else {
+                        windResistance = currentCourseId === 'basic' ? 1.18 : 1.12;
+                    }
                     staminaCost *= windResistance;
                     currentSpeed *= 0.985; 
 
@@ -2606,8 +2759,8 @@
 
             } else {
                 let distToLeader = currentLeader.run_dist - horse.run_dist;
-                let spurtMod = horse.makuriTriggered ? 1.002 : (horse.isChokusenIkki ? 1.06 : 1.0);
-                let spurtStaminaMod = horse.makuriTriggered ? 1.25 : (horse.isChokusenIkki ? 0.9 : 1.0);
+                let spurtMod = horse.makuriTriggered ? 0.97 : (horse.isChokusenIkki ? 1.12 : 1.0);
+                let spurtStaminaMod = horse.makuriTriggered ? (horse === currentLeader ? 1.75 : 1.45) : (horse.isChokusenIkki ? 0.82 : 1.0);
                 let spurtSpeedMulti = 1.0;
                 let spurtStaminaCost = 1.0;
 
@@ -2622,11 +2775,16 @@
                 } else if (cPace === 'slow') {
                     paceSpurtStaminaMod = 0.88; // スローペース：温存した分スパートが軽い
                     paceSpurtSpeedMod = 1.01;   // わずかに速度が乗りやすい
+                    // 逃げ馬は道中で大きく脚を溜めている分、直線でも粘り強い
+                    if (horse.type === 'nige') {
+                        paceSpurtStaminaMod *= 0.55;
+                        paceSpurtSpeedMod *= 1.03;
+                    }
                 } else if (cPace === 'dainige') {
                     if (horse === currentLeader) {
-                        paceSpurtStaminaMod = 1.45; // 大逃げ馬は直線で大ガス欠（止まりやすい）
+                        paceSpurtStaminaMod = 1.15; // 大逃げ馬の直線消耗を控えめに（粘れる）
                     } else {
-                        paceSpurtStaminaMod = 0.92; // 後続は余力ありだが、離された分の差し脚は必要
+                        paceSpurtStaminaMod = 1.0;  // 後続は特別な余力ボーナスなし
                     }
                 }
 
@@ -2642,26 +2800,38 @@
 
                 if (currentCourseId === 'sonoda') {
                     // 園田：逃げ・先行の粘りを強化、差し・追込の爆発力を抑制してバランスを均等化
-                    if(horse.type === 'nige') { spurtSpeedMulti = 0.97 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
+                    if(horse.type === 'nige') { spurtSpeedMulti = 1.08 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
                     else if(horse.type === 'senko') { spurtSpeedMulti = 1.09 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
                     else if(horse.type === 'sashi') { spurtSpeedMulti = 1.09 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
                     else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.16 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
                 } else {
-                    if(horse.type === 'nige') { spurtSpeedMulti = 0.92 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
+                    if(horse.type === 'nige') { spurtSpeedMulti = 1.05 * horse.spurt; spurtStaminaCost = spStNige * courseSpurtMod; }
                     else if(horse.type === 'senko') { spurtSpeedMulti = 1.03 * horse.spurt; spurtStaminaCost = spStSenko * courseSpurtMod; }
                     else if(horse.type === 'sashi') { spurtSpeedMulti = 1.15 * horse.spurt * spurtMod; spurtStaminaCost = spStSashi * spurtStaminaMod * courseSpurtMod; }
                     else if(horse.type === 'oikomi') { spurtSpeedMulti = 1.25 * horse.spurt * spurtMod; spurtStaminaCost = spStOikomi * spurtStaminaMod * courseSpurtMod; }
                 }
 
                 let catchUpBonus = 1.0;
-                if (distToLeader > 3 && horse.currentStamina > 0) {
+                if (horse.currentStamina > 0) {
                     let catchUpRate = currentCourseId === 'basic' ? 0.0060 : 0.0038;
 
                     if (!horse.makuriTriggered && (horse.type === 'sashi' || horse.type === 'oikomi') && horse.currentStamina > 25) {
-                        catchUpRate *= currentCourseId === 'sonoda' ? 1.3 : 1.3;
+                        let catchUpMult = currentCourseId === 'sonoda' ? 1.4 : 1.4;
+                        // ハイペースは前が消耗→後方の末脚がより際立つ
+                        if (cPace === 'high' || cPace === 'dainige') catchUpMult *= 1.35;
+                        catchUpRate *= catchUpMult;
                     }
 
-                    catchUpBonus = 1.0 + (distToLeader * catchUpRate);
+                    // 先頭との距離でなく「残りスタミナ比率」でボーナスを計算する。
+                    // これにより前に詰め寄っても勢いが止まらず、最後まで伸び続ける。
+                    const staminaRatio = horse.currentStamina / horse.maxStamina;
+                    if (distToLeader > 3) {
+                        // 後方にいる間はdistToLeaderベース（従来通り）
+                        catchUpBonus = 1.0 + (distToLeader * catchUpRate);
+                    } else {
+                        // 先頭に並びかけてもスタミナ残量分のブーストを維持（勢いを止めない）
+                        catchUpBonus = 1.0 + (catchUpRate * 8 * staminaRatio);
+                    }
                     let maxCatchUpSpurt = currentCourseId === 'basic' ? 1.32 : 1.26;
                     catchUpBonus = Math.min(maxCatchUpSpurt, catchUpBonus);
 
@@ -2675,6 +2845,10 @@
                     if (remainToGoal < 30) {
                         catchUpBonus *= 1.02;
                     }
+                }
+                // スローペースは瞬発力勝負で全馬が末脚を使えるため、後続が離されにくい（着差が詰まる）
+                if (cPace === 'slow' && remainToGoal < spurtDist && horse.currentStamina > 0 && distToLeader > 5) {
+                    catchUpBonus *= 1.04;
                 }
 
                 let leaderPenalty = 1.0;
@@ -2696,7 +2870,7 @@
 
                     // スタミナが「45」を切ると、0に向かってジワジワとスピードが低下する
                     // 芝：下限0.70 / ダート：下限0.62（ダートは消耗戦＝バテるとより止まる）
-                    const fadeFloor = currentSurface === 'dirt' ? 0.60 : 0.68;
+                    const fadeFloor = currentSurface === 'dirt' ? 0.54 : 0.62;
                     if (horse.currentStamina < 42) {
                         let t = horse.currentStamina / 42; // 1.0 (残42) -> 0.0 (残0)
                         // カーブを少し効かせ、残量が減るほど加速度的に垂れる
@@ -2706,11 +2880,31 @@
                     
                     let reserveKire = 1.0;
                     if (!horse.makuriTriggered && (horse.type === 'sashi' || horse.type === 'oikomi') && horse.currentStamina > 20) {
-                        reserveKire = 1.0 + (horse.currentStamina - 20) * 0.0015;
-                        reserveKire = Math.min(1.06, reserveKire); 
+                        // まくらずに道中を溜めた差し・追込は直線で末脚が爆発する
+                        // スタミナ残量ボーナス（上限を引き上げ）
+                        reserveKire = 1.0 + (horse.currentStamina - 20) * 0.0030;
+                        reserveKire = Math.min(1.14, reserveKire);
+                        // ハイペースなら前が消耗している分、差し追込がさらに有利
+                        if (cPace === 'high' || cPace === 'dainige') {
+                            reserveKire *= 1.10;
+                        }
+                        reserveKire = Math.min(1.20, reserveKire); // 全体上限
                     }
 
-                    currentSpeed *= (spurtSpeedMulti * staminaFade * catchUpBonus * leaderPenalty * reserveKire * paceSpurtSpeedMod);
+                    // 直線で他馬に交わされた場合のスピードダウン（闘志が折れる）
+                    // 自分のすぐ後ろ（5m以内）から速く来て追い抜いた馬がいれば減速
+                    let overtakenPenalty = 1.0;
+                    if (remainToGoal < spurtDist && remainToGoal > 30) {
+                        const wasOvertaken = allHorses.some(other => {
+                            if (other === horse) return false;
+                            const otherDist = other.run_dist - horse.run_dist;
+                            // 直前フレームで後ろにいた馬（5m以内）が今フレームで前に出た
+                            return otherDist > 0 && otherDist < 3 && other.currentVelocity > horse.currentVelocity + 0.3;
+                        });
+                        if (wasOvertaken) overtakenPenalty = 0.965; // 交わされると約3.5%減速
+                    }
+
+                    currentSpeed *= (spurtSpeedMulti * staminaFade * catchUpBonus * leaderPenalty * reserveKire * paceSpurtSpeedMod * overtakenPenalty);
                     staminaCost = spurtStaminaCost * paceSpurtStaminaMod;
 
                     if (horse === currentLeader) {
@@ -2740,9 +2934,10 @@
                     let smoothPenalty;
                     let ex = horse.exhaustion;
                     if (currentCourseId === 'basic') {
-                        smoothPenalty = 0.88 * Math.max(0.60, 1.0 - (ex * 0.004));
+                        // 即時0.78倍、exhaustion蓄積で最大0.52倍まで追加減速
+                        smoothPenalty = 0.78 * Math.max(0.52, 1.0 - (ex * 0.006));
                     } else {
-                        smoothPenalty = 0.85 * Math.max(0.55, 1.0 - (ex * 0.005));
+                        smoothPenalty = 0.78 * Math.max(0.52, 1.0 - (ex * 0.007));
                     }
 
                     currentSpeed *= (spurtSpeedMulti * smoothPenalty * paceSpurtSpeedMod);
@@ -2803,7 +2998,11 @@
             
             if (draftTarget && progress < 0.75) {
                 let offset = ((horse.horseNum * 1.3) % 1.6) - 0.8; 
-                baseTargetLane = Math.max(0, Math.min(8.0, draftTarget.lane + offset));
+                let newTarget = Math.max(0, Math.min(8.0, draftTarget.lane + offset));
+                // 現在のlaneと大きく差がある時だけdraftTargetに追随（微小変化を無視）
+                if (Math.abs(newTarget - horse.lane) > 1.0) {
+                    baseTargetLane = newTarget;
+                }
             } else {
                 if (isFinalStraight) {
                     if (currentCourseId === 'basic') {
@@ -2818,7 +3017,7 @@
                     } else {
                         baseTargetLane = horse.lane; 
                     }
-                } else if (progress > 0.03) {
+                } else if (progress > 0.005) {
                     let personalInner = 0.5 + ((horse.horseNum * 1.7) % 2.5); 
                     
                     if (horse.run_dist < 600) {
@@ -2826,10 +3025,10 @@
                             if (horse.courseType === 'in' && Math.random() > 0.4) {
                                 personalInner = 0.0 + ((horse.horseNum * 1.0) % 1.0); 
                             } else {
-                                personalInner = 1.5 + ((horse.horseNum * 1.0) % 1.5); 
+                                personalInner = 0.3 + ((horse.horseNum * 1.0) % 1.0); 
                             }
                         } else {
-                            personalInner = 0.2 + ((horse.horseNum * 1.0) % 1.5); 
+                            personalInner = 0.0 + ((horse.horseNum * 1.0) % 0.8); 
                         }
                     } else {
                         if (currentCourseId === 'sonoda') {
@@ -2852,14 +3051,25 @@
             }
 
             targetLane = horse.lane;
-            if (Math.abs(horse.lane - baseTargetLane) > 0.3) {
-                // 前後約1馬身（run_distで9.5未満）以内に他馬がいる場合は、
-                // 接触・幅寄せのような不自然な横移動を避けるためレーン変更を保留する。
-                const ONE_HORSE_LENGTH = 9.5;
+            if (Math.abs(horse.lane - baseTargetLane) > 0.6) { // 閾値を0.3→0.6に上げて微小変化を無視
+                // 目標レーンへ近づく方向に、馬の形（レーン幅）が一定以上重なる他馬がいないかチェック。
+                // 1レーン=1頭分の幅。外を回している馬（4頭目以上＝lane>=3）は強引にでもインへ入りたいので
+                // クリアランス基準を緩め、すでにインにいる馬（3頭目以内）は簡単に内外が入れ替わらないよう厳しくする。
+                const movingIn = baseTargetLane < horse.lane;
+                const isOuter = horse.lane >= 3; // 4頭分以上外を回っている
+                let moveClearance;
+                if (movingIn) {
+                    moveClearance = isOuter ? 0.30 : 0.65; // 外の馬は強引に内へ / 内の馬は慎重に
+                } else {
+                    moveClearance = 0.90; // 外へ動くのは衝突防止のため厳しめ
+                }
                 let hasCloseHorse = false;
                 for (let other of allHorses) {
                     if (other === horse) continue;
-                    if (Math.abs(other.run_dist - horse.run_dist) < ONE_HORSE_LENGTH) {
+                    let distDiff = Math.abs(other.run_dist - horse.run_dist);
+                    if (distDiff > 15) continue; // 大きく前後に離れていれば干渉しない
+                    let laneDiff = Math.abs(other.lane - horse.lane);
+                    if (laneDiff < moveClearance) {
                         hasCloseHorse = true;
                         break;
                     }
@@ -2867,7 +3077,10 @@
                 // ブロックされて避ける必要がある場合（blocker確定後）は別途処理されるため、
                 // ここでは「目標レーンへのゆっくりとした追従」のみを抑制する。
                 if (!hasCloseHorse) {
-                    targetLane = horse.lane + (baseTargetLane - horse.lane) * 0.08;
+                    // スタート直後や、外を大きく回している馬は、強めに内へ詰める
+                    let followRate = 0.08;
+                    if (movingIn && (horse.run_dist < 600 || isOuter)) followRate = 0.18;
+                    targetLane = horse.lane + (baseTargetLane - horse.lane) * followRate;
                 }
             }
 
@@ -3233,6 +3446,15 @@
         
         function simulateRaceComplete(raceHorses, dist) {
             let simPace = determinePace(raceHorses, dist);
+            // 走破タイム積算用（メインループのraceClock計算を簡略再現）
+            let simRaceClock = 0;
+            let simLastFrontDist = 0;
+            const simBaseSpeed = dist / parTime(dist);
+            const simPaceWavePhase = Math.random();
+            let simPaceTypeFactor = 1.0;
+            if (simPace === 'high') simPaceTypeFactor = 1.006;
+            else if (simPace === 'dainige') simPaceTypeFactor = 1.004;
+            else if (simPace === 'slow') simPaceTypeFactor = 0.992;
 
             let simHorses = raceHorses.map((h, index) => {
                 let randomFactor = -Math.log(-Math.log(Math.random())); 
@@ -3315,7 +3537,11 @@
                         speedMultiplier = 0.18; 
                     } else if (remainToGoal <= finalStraightLen + 300) {
                         let ratio = (remainToGoal - finalStraightLen) / 300;
-                        speedMultiplier = 0.18 + (0.42 * ratio); 
+                        speedMultiplier = 0.18 + (0.32 * ratio); // 勝負所手前でじっくり
+                    } else if (remainToGoal <= 800) {
+                        // 残り800m〜直線手前：徐々にスローに（ワクワク感を演出）
+                        let ratio = (remainToGoal - (finalStraightLen + 300)) / (800 - finalStraightLen - 300);
+                        speedMultiplier = 0.25 + (0.08 * ratio); // 0.25〜0.33でゆっくり
                     } else if (currentDist < 400) {
                         speedMultiplier = 0.45;
                     } else if (currentDist < 800) {
@@ -3327,9 +3553,13 @@
                 } else {
                     if (remainToGoal <= finalStraightLen) {
                         speedMultiplier = 0.20; 
-                    } else if (remainToGoal <= 1000) {
-                        let ratio = (remainToGoal - finalStraightLen) / (1000 - finalStraightLen);
-                        speedMultiplier = 0.20 + (0.45 * ratio); 
+                    } else if (remainToGoal <= finalStraightLen + 300) {
+                        let ratio = (remainToGoal - finalStraightLen) / 300;
+                        speedMultiplier = 0.20 + (0.30 * ratio); // 勝負所手前でじっくり
+                    } else if (remainToGoal <= 800) {
+                        // 残り800m〜直線手前：徐々にスローに
+                        let ratio = (remainToGoal - (finalStraightLen + 300)) / (800 - finalStraightLen - 300);
+                        speedMultiplier = 0.25 + (0.08 * ratio); // 0.25〜0.33
                     } else if (currentDist < 400) {
                         speedMultiplier = 0.5;
                     } else if (currentDist < 800) {
@@ -3347,14 +3577,71 @@
                         isFinished = true;
                     }
                 }
+
+                // 走破タイム積算（メインのraceClock計算を簡略再現）
+                {
+                    let frontNow = Math.min(cLeader.run_dist, dist);
+                    let dd = frontNow - simLastFrontDist;
+                    if (dd > 0 && !isFinished) {
+                        let strengthFactor = cLeader.actualSpeedBase / 1.35;
+                        strengthFactor = Math.max(0.94, Math.min(1.06, strengthFactor));
+                        let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
+                        const CLOCK_CAL = 0.958;
+                        let p = dist > 0 ? Math.min(1, frontNow / dist) : 0;
+                        let paceShape;
+                        if (simPace === 'high' || simPace === 'dainige') {
+                            let highCoef = dist >= 2200 ? 0.10 : (dist >= 1700 ? 0.18 : 0.24);
+                            paceShape = 1 + highCoef * (1/3 - p * p);
+                        } else if (simPace === 'slow') {
+                            paceShape = 1 + 0.20 * (p * p - 1/3);
+                        } else {
+                            paceShape = 1 + 0.10 * (0.5 - p);
+                        }
+                        let paceWave = 0.025 * Math.sin(2 * Math.PI * (2 * p + simPaceWavePhase));
+                        let paceProfile = paceShape + paceWave;
+                        let effSpeed = simBaseSpeed * strengthFactor * simPaceTypeFactor * dashClockFactor * CLOCK_CAL * paceProfile;
+                        simRaceClock += dd / effSpeed;
+                    }
+                    simLastFrontDist = frontNow;
+                    if (isFinished) {
+                        // 最終区間（frontNowからdistまで）を同条件で加算してゴールタイムを確定
+                        let remainDd = dist - simLastFrontDist;
+                        if (remainDd > 0) {
+                            let strengthFactor = cLeader.actualSpeedBase / 1.35;
+                            strengthFactor = Math.max(0.94, Math.min(1.06, strengthFactor));
+                            const CLOCK_CAL = 0.958;
+                            let p = 1.0;
+                            let paceShape;
+                            { let hc = dist >= 2200 ? 0.15 : (dist >= 1700 ? 0.18 : 0.24); if (simPace === 'high' || simPace === 'dainige') paceShape = 1 + hc * (1/3 - p * p); else paceShape = simPace === 'slow' ? 1 + 0.20*(p*p-1/3) : 1 + 0.10*(0.5-p); }
+                            let effSpeed = simBaseSpeed * strengthFactor * simPaceTypeFactor * 1.0 * CLOCK_CAL * paceShape;
+                            simRaceClock += remainDd / effSpeed;
+                        }
+                    }
+                }
             }
             
-            return simHorses.sort((a, b) => b.run_dist - a.run_dist);
+            // ゴール前の僅差勝負における運の要素（着差判定のシャッフル）。
+            // レース展開の構造上、わずかな速度差が蓄積し設定勝率以上に着順が固定化しやすい。
+            // 設定勝率に比例した小さな有利ノイズ + 大きなランダム要素で「強い馬はわずかに有利だが独占はしない」を実現。
+            simHorses.forEach(h => {
+                const wr = h.simWinRate || h.currentWinRate || 0.05;
+                const wrBonus = Math.log(Math.max(wr, 0.005) / 0.0556 + 0.1) * 8; // 強い馬はわずかに有利
+                const randNoise = (Math.random() - 0.5) * 75;                      // ±4馬身相当のランダム
+                h.finishNoise = wrBonus + randNoise;
+            });
+            let sortedResult = simHorses.sort((a, b) => (b.run_dist + b.finishNoise) - (a.run_dist + a.finishNoise));
+            return { horses: sortedResult, pace: simPace, time: simRaceClock };
         }
 
         function simulateSingleRace() {
             let result = simulateRaceComplete(currentHorses, total_dist);
-            return result[0];
+            return {
+                first: result.horses[0],
+                second: result.horses[1],
+                third: result.horses[2],
+                pace: result.pace,
+                time: result.time
+            };
         }
 
         // --- 1万回全馬シミュレーション＆CSV出力 ---
@@ -3416,6 +3703,62 @@
             document.body.removeChild(link);
         }
 
+        // --- 5万回全馬シミュレーション＆CSV出力 ---
+        const globalSim50kBtn = document.getElementById('globalSim50kBtn');
+
+        globalSim50kBtn.addEventListener('click', () => {
+            if (isRacing) return;
+
+            const originalText = '💾 5万回全馬シミュ';
+            globalSim50kBtn.innerHTML = '⏳ 0 / 50000 計算中...';
+            globalSim50kBtn.disabled = true;
+            globalSimBtn.disabled = true;
+            simBtn.disabled = true;
+            startBtn.disabled = true;
+
+            let stats = {};
+            horsesPool.forEach(h => {
+                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0 };
+            });
+
+            const totalSims = 50000;
+            let currentSim = 0;
+            const batchSize = 100; // 大きめのバッチで効率化
+
+            function runBatch50k() {
+                for (let i = 0; i < batchSize && currentSim < totalSims; i++) {
+                    let raceHorses = prepareRandomRaceHorses();
+                    let result = simulateRaceComplete(raceHorses, total_dist);
+
+                    result.horses.forEach((h, rank) => {
+                        let st = stats[h.name];
+                        st.starts++;
+                        if (rank === 0) st.first++;
+                        else if (rank === 1) st.second++;
+                        else if (rank === 2) st.third++;
+                        else st.out++;
+                    });
+                    currentSim++;
+                }
+
+                if (currentSim < totalSims) {
+                    if (currentSim % 1000 === 0) { // 1000回ごとに表示更新
+                        globalSim50kBtn.innerHTML = `⏳ ${currentSim.toLocaleString()} / 50,000`;
+                    }
+                    setTimeout(runBatch50k, 0);
+                } else {
+                    downloadCSV(stats);
+                    globalSim50kBtn.innerHTML = originalText;
+                    globalSim50kBtn.disabled = false;
+                    globalSimBtn.disabled = false;
+                    simBtn.disabled = false;
+                    startBtn.disabled = false;
+                }
+            }
+
+            setTimeout(runBatch50k, 10);
+        });
+
         globalSimBtn.addEventListener('click', () => {
             if (isRacing) return;
             
@@ -3439,7 +3782,7 @@
                     let raceHorses = prepareRandomRaceHorses();
                     let result = simulateRaceComplete(raceHorses, total_dist);
                     
-                    result.forEach((h, rank) => {
+                    result.horses.forEach((h, rank) => {
                         let st = stats[h.name];
                         st.starts++;
                         if (rank === 0) st.first++;
@@ -3474,16 +3817,39 @@
             startBtn.disabled = true;
             
             let winCounts = {};
-            currentHorses.forEach(h => winCounts[h.name] = 0);
-            
+            let placeCounts = {}; // {name: {first, second, third}}
+            currentHorses.forEach(h => {
+                winCounts[h.name] = 0;
+                placeCounts[h.name] = { first: 0, second: 0, third: 0 };
+            });
+
+            // ペース別（slow/middle/high/dainige）の集計：1-3着の脚質カウントと走破タイム合計
+            let paceStats = {
+                slow:   { count: 0, typeCounts: { nige: 0, senko: 0, sashi: 0, oikomi: 0 }, timeSum: 0 },
+                middle: { count: 0, typeCounts: { nige: 0, senko: 0, sashi: 0, oikomi: 0 }, timeSum: 0 },
+                high:   { count: 0, typeCounts: { nige: 0, senko: 0, sashi: 0, oikomi: 0 }, timeSum: 0 },
+                dainige:{ count: 0, typeCounts: { nige: 0, senko: 0, sashi: 0, oikomi: 0 }, timeSum: 0 },
+            };
+
             const totalSims = 1000;
             let currentSim = 0;
             const batchSize = 20; 
 
             function runBatch() {
                 for (let i = 0; i < batchSize && currentSim < totalSims; i++) {
-                    let winner = simulateSingleRace();
-                    if(winner) winCounts[winner.name]++;
+                    let r = simulateSingleRace();
+                    if (r.first)  { winCounts[r.first.name]++;  placeCounts[r.first.name].first++; }
+                    if (r.second) { placeCounts[r.second.name].second++; }
+                    if (r.third)  { placeCounts[r.third.name].third++; }
+
+                    let pKey = r.pace === 'dainige' ? 'dainige' : (r.pace === 'high' ? 'high' : (r.pace === 'slow' ? 'slow' : 'middle'));
+                    let ps = paceStats[pKey];
+                    ps.count++;
+                    ps.timeSum += r.time;
+                    [r.first, r.second, r.third].forEach(h => {
+                        if (h && ps.typeCounts[h.type] !== undefined) ps.typeCounts[h.type]++;
+                    });
+
                     currentSim++;
                 }
 
@@ -3491,7 +3857,7 @@
                     simBtn.innerHTML = `⏳ ${currentSim} / ${totalSims} 計算中...`;
                     setTimeout(runBatch, 0); 
                 } else {
-                    showSimResult(winCounts, totalSims);
+                    showSimResult(winCounts, placeCounts, paceStats, totalSims);
                     simBtn.innerHTML = originalText;
                     simBtn.disabled = false;
                     startBtn.disabled = false;
@@ -3501,7 +3867,9 @@
             setTimeout(runBatch, 10);
         });
 
-        function showSimResult(winCounts, total) {
+        function showSimResult(winCounts, placeCounts, paceStats, total) {
+            // AI分析用にデータを保持
+            lastSimData = { winCounts, placeCounts, paceStats, total, horses: currentHorses, dist: total_dist };
             const tbody = document.getElementById('simResultTableBody');
             tbody.innerHTML = '';
             
@@ -3510,6 +3878,7 @@
                 tr.className = "bg-white border-b hover:bg-gray-50";
                 
                 const winCount = winCounts[horse.name];
+                const pc = placeCounts[horse.name];
                 const actualWinRate = (winCount / total * 100).toFixed(1) + '%';
                 const expectedWinRate = (horse.currentWinRate * 100).toFixed(1) + '%';
                 
@@ -3528,10 +3897,47 @@
                     <td class="px-4 py-3 text-right">${horse.odds.toFixed(1)}</td>
                     <td class="px-4 py-3 text-right">${expectedWinRate}</td>
                     <td class="px-4 py-3 text-right ${diffColor}">${actualWinRate}</td>
-                    <td class="px-4 py-3 text-right font-bold text-gray-800">${winCount}回</td>
+                    <td class="px-4 py-3 text-right font-bold text-gray-800">${pc.first}回</td>
+                    <td class="px-4 py-3 text-right font-bold text-gray-600">${pc.second}回</td>
+                    <td class="px-4 py-3 text-right font-bold text-gray-600">${pc.third}回</td>
                 `;
                 tbody.appendChild(tr);
             });
+
+            // ペース別（スロー/ミドル/ハイ/大逃げ）の1-3着 脚質集計・平均勝ちタイム
+            const paceTbody = document.getElementById('simPaceTableBody');
+            if (paceTbody) {
+                paceTbody.innerHTML = '';
+                const paceLabels = { slow: 'スロー', middle: 'ミドル', high: 'ハイ', dainige: '大逃げ' };
+                Object.keys(paceLabels).forEach(key => {
+                    const ps = paceStats[key];
+                    const tr = document.createElement('tr');
+                    tr.className = "bg-white border-b hover:bg-gray-50";
+                    if (ps.count === 0) {
+                        tr.innerHTML = `
+                            <td class="px-4 py-3 font-bold">${paceLabels[key]}</td>
+                            <td class="px-4 py-3 text-right text-gray-400">0回</td>
+                            <td class="px-4 py-3 text-center text-gray-400" colspan="4">該当レースなし</td>
+                            <td class="px-4 py-3 text-right text-gray-400">-</td>
+                        `;
+                    } else {
+                        const total3 = ps.count * 3; // 1-3着の総数
+                        const typeCells = ['nige','senko','sashi','oikomi'].map(t => {
+                            const c = ps.typeCounts[t];
+                            const pct = (c / total3 * 100).toFixed(1);
+                            return `<td class="px-4 py-3 text-right">${c}回 <span class="text-gray-400 text-xs">(${pct}%)</span></td>`;
+                        }).join('');
+                        const avgTime = ps.timeSum / ps.count;
+                        tr.innerHTML = `
+                            <td class="px-4 py-3 font-bold">${paceLabels[key]}</td>
+                            <td class="px-4 py-3 text-right">${ps.count}回</td>
+                            ${typeCells}
+                            <td class="px-4 py-3 text-right font-bold text-purple-700">${formatRaceTime(avgTime)}</td>
+                        `;
+                    }
+                    paceTbody.appendChild(tr);
+                });
+            }
             
             simResultPanel.classList.remove('hidden');
             setTimeout(() => {
@@ -3545,6 +3951,53 @@
             setTimeout(() => {
                 simResultPanel.classList.add('hidden');
             }, 300);
+        });
+
+        document.getElementById('copySimBtn').addEventListener('click', () => {
+            if (!lastSimData) return;
+            const { winCounts, placeCounts, paceStats, total, horses, dist } = lastSimData;
+            const paceLabels = { slow: 'スロー', middle: 'ミドル', high: 'ハイ', dainige: '大逃げ' };
+            let text = `【${dist}m 1000回シミュ結果】\n`;
+            text += `枠/番 馬名(脚質) 設定勝率 → シミュ勝率 1着/2着/3着\n`;
+            horses.forEach(h => {
+                const pc = placeCounts[h.name];
+                const simRate = (winCounts[h.name] / total * 100).toFixed(1);
+                const setRate = (h.currentWinRate * 100).toFixed(1);
+                const gap = ((winCounts[h.name] / total - h.currentWinRate) * 100);
+                const gapStr = (gap >= 0 ? '+' : '') + gap.toFixed(1);
+                text += `${h.wakuNum}枠${h.horseNum}番 ${h.name}(${h.type}) ${setRate}%→${simRate}%(${gapStr}%) ${pc.first}/${pc.second}/${pc.third}\n`;
+            });
+            text += `\n【ペース別集計】\n`;
+            Object.keys(paceLabels).forEach(key => {
+                const ps = paceStats[key];
+                if (ps.count === 0) return;
+                const avgTime = ps.timeSum / ps.count;
+                const min = Math.floor(avgTime / 60);
+                const sec = (avgTime - min * 60).toFixed(1);
+                const t3 = ps.count * 3;
+                const pct = (ps.count / total * 100).toFixed(0);
+                text += `${paceLabels[key]}: ${ps.count}回(${pct}%) 平均${min}:${String(sec).padStart(4,'0')} 逃${ps.typeCounts.nige}(${(ps.typeCounts.nige/t3*100).toFixed(0)}%) 先${ps.typeCounts.senko}(${(ps.typeCounts.senko/t3*100).toFixed(0)}%) 差${ps.typeCounts.sashi}(${(ps.typeCounts.sashi/t3*100).toFixed(0)}%) 追${ps.typeCounts.oikomi}(${(ps.typeCounts.oikomi/t3*100).toFixed(0)}%)\n`;
+            });
+            text += `\nこの結果を分析して、バランス改善の提案をしてください。`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                const msg = document.getElementById('copySimMsg');
+                msg.classList.remove('hidden');
+                msg.textContent = '✅ コピーしました！Claudeのチャットに貼り付けて分析を依頼してください。';
+                setTimeout(() => msg.classList.add('hidden'), 4000);
+            }).catch(() => {
+                // fallback
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                const msg = document.getElementById('copySimMsg');
+                msg.classList.remove('hidden');
+                msg.textContent = '✅ コピーしました！Claudeのチャットに貼り付けてください。';
+                setTimeout(() => msg.classList.add('hidden'), 4000);
+            });
         });
 
         // ==========================================
@@ -3752,16 +4205,28 @@
                     horse.finishOrder = finishedHorses.length;
 
                     let order = horse.finishOrder;
+                    if (order >= 2) {
+                        // 着差は「1着がゴールした瞬間に、その馬がどれだけ後方にいたか」で確定済み（下のorder===1で記録）
+                        // ここではフォールバックのみ（万一未記録なら現在の距離差）
+                        if (horse.gapFromWinner === undefined || horse.gapFromWinner === null) {
+                            horse.gapFromWinner = Math.max(0.1, total_dist - horse.run_dist);
+                        }
+                    }
                     if (order === 1) {
                         horse.gapFromWinner = 0;
                         horse.raceTime = (Date.now() - raceStartTime) / 1000;
+                        horse.finishRaceClock = raceClock; // 1着のゴール時刻を記録
+                        horse.finishVelocity = horse.currentVelocity; // ゴール時速度を保存
+                        // 1着ゴールの瞬間に、他の全馬の「先頭からの距離」を着差として確定する
+                        horses.forEach(h => {
+                            if (h !== horse && !h.isGoal) {
+                                h.gapFromWinner = Math.max(0.1, total_dist - h.run_dist);
+                            }
+                        });
                         // 上がり600mタイム確定（先頭が残り600m通過からゴールまでのraceClock差）
                         if (last600StartClock >= 0) {
                             last600Time = raceClock - last600StartClock;
                         }
-                        horses.forEach(h => {
-                            if (!h.isGoal) h.gapFromWinner = total_dist - h.run_dist;
-                        });
                         let second = currentRanking.find(h => h !== horse && !h.isGoal);
                         let gap = second ? horse.run_dist - second.run_dist : 99;
                         if (gap <= 3.0) {
@@ -3837,18 +4302,27 @@
                 if (frontNow2 >= paceSplitDist && paceBaseSum > 0) {
                     const paceIndex = paceVelSum / paceBaseSum; // 1.0で標準、>速い／<遅い
                     measuredPaceIndex = paceIndex; // 走破タイムにも反映（速い流れ＝速い時計）
-                    const HIGH_TH = 1.018;
-                    const SLOW_TH = 0.965;
+                    // 距離が長いほどハイ判定を厳しく（中長距離はハイ25/ミドル50/スロー25を目安に）
+                    let HIGH_TH, SLOW_TH;
+                    if (total_dist <= 1600) {
+                        HIGH_TH = 1.018; SLOW_TH = 0.965;
+                    } else if (total_dist <= 2000) {
+                        HIGH_TH = 1.040; SLOW_TH = 0.985;
+                    } else {
+                        HIGH_TH = 1.048; SLOW_TH = 0.990;
+                    }
                     if (paceIndex >= HIGH_TH) currentPace = 'high';
                     else if (paceIndex <= SLOW_TH) currentPace = 'slow';
                     else currentPace = 'middle';
 
                     // 大逃げ：単騎の逃げ馬が後続を大きく離して速い流れを作っているとき
+                    // 中長距離では発生しにくいよう、必要な差を大きくする
                     if (currentPace === 'high' && frontHorse && frontHorse.type === 'nige') {
                         let second = currentRanking.find(h => h !== frontHorse);
                         let gap = second ? (frontHorse.run_dist - second.run_dist) : 0;
                         let otherNige = horses.some(h => h !== frontHorse && h.type === 'nige' && (frontHorse.run_dist - h.run_dist) < 12);
-                        if (gap > 18 && !otherNige) currentPace = 'dainige';
+                        let dainigeGap = total_dist <= 1600 ? 18 : 30;
+                        if (gap > dainigeGap && !otherNige) currentPace = 'dainige';
                     }
                     paceDecided = true;
                 }
@@ -3872,23 +4346,26 @@
                     // ペース：実測ペース指標に加え、確定したペースタイプでも時計を動かす。
                     // ハイは前半が速くても後半が大きく垂れるため、全体時計はむしろ遅くなる（消耗戦）。
                     // スローは前半緩いが上がり勝負で締まり、全体時計は標準よりやや遅い程度。
-                    let paceSpeedFactor = Math.max(0.96, Math.min(1.05, measuredPaceIndex));
+                    // 長距離ほどペース指数の影響を小さくする（2400mで中盤が速くなりすぎない）
+                    let paceSpeedMax = total_dist >= 2200 ? 1.02 : (total_dist >= 1700 ? 1.04 : 1.05);
+                    let paceSpeedFactor = Math.max(0.96, Math.min(paceSpeedMax, measuredPaceIndex));
                     let paceTypeFactor = 1.0;
-                    if (currentPace === 'high')      paceTypeFactor = 0.990;
-                    else if (currentPace === 'dainige') paceTypeFactor = 0.995;
+                    if (currentPace === 'high')      paceTypeFactor = 1.006;
+                    else if (currentPace === 'dainige') paceTypeFactor = 1.004;
                     else if (currentPace === 'slow') paceTypeFactor = 0.992;
                     paceSpeedFactor *= paceTypeFactor;
                     // 発走直後は加速途上で時計が遅い（最初の1ハロンが最も遅い）。CLOCK_CALで全体を基準タイムに再校正。
                     let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
-                    const CLOCK_CAL = 1.005;
+                    const CLOCK_CAL = 0.958;
                     // 道中の速度配分（脚質・ペース連動のラップ・プロファイル）。先頭の進捗 p(0→1) で形を変える。
                     // 各形状は区間平均≒1.0に正規化してあるので総タイム(=1:25基準)は変えず、ラップにだけ起伏を作る。
                     // ハイ/大逃げ＝前傾(テン速い→上がり失速)、スロー＝瞬発戦(道中緩い→上がり最速)、ミドル＝緩やかな前傾。
                     let p = total_dist > 0 ? Math.min(1, frontNow / total_dist) : 0;
                     let paceShape;
                     if (currentPace === 'high' || currentPace === 'dainige') {
-                        // 前傾：テンは速いが後半は明確にラップが落ちる（消耗戦）。係数を強めて起伏を大きく。
-                        paceShape = 1 + 0.34 * (1/3 - p * p);   // 序盤≒+0.11 / 終盤≒-0.23
+                        // 長距離ほど前傾を緩める（2400mで中盤が速くなりすぎないよう）
+                        let highCoef = total_dist >= 2200 ? 0.15 : (total_dist >= 1700 ? 0.18 : 0.24);
+                        paceShape = 1 + highCoef * (1/3 - p * p);
                     } else if (currentPace === 'slow') {
                         paceShape = 1 + 0.20 * (p * p - 1/3);   // 後傾：道中緩く上がりで加速（ヨーイドン）
                     } else {
@@ -4336,6 +4813,17 @@
         }
 
         function finishRace(winner, betHorseName, betAmount) {
+            // レース内容をコピー用に保存
+            lastRaceData = {
+                dist: total_dist,
+                surface: currentSurface,
+                pace: currentPace,
+                finishedHorses: [...finishedHorses],
+                allHorses: [...horses],
+                lapList: [...lapList],
+                last600Time,
+                cornerPassMarks,
+            };
             if (isPhotoFinishTriggered) {
                 isRacing = false; 
                 commentary.innerText = `1着争いは大接戦！ 写真判定の確認に入ります！`;
@@ -4380,13 +4868,14 @@
             // 1馬身 ≒ 7.2ゲーム単位（馬体長18 * scale1.2 / TRACK_SCALE3）
             function gapToText(gap) {
                 if (gap === 0) return '';
-                if (gap < 1.2) return 'ハナ';
-                if (gap < 2.8) return 'クビ';
-                if (gap < 5.0) return '1/2馬身';
-                if (gap < 9.5) return '1馬身';
-                if (gap < 17.0) return '2馬身';
-                if (gap < 27.0) return '3馬身';
-                if (gap < 48.0) return '5馬身';
+                if (gap < 3) return 'ハナ';
+                if (gap < 7) return 'クビ';
+                if (gap < 13) return '1/2馬身';
+                if (gap < 22) return '1馬身';
+                if (gap < 40) return '2馬身';
+                if (gap < 65) return '3馬身';
+                if (gap < 110) return '5馬身';
+                if (gap < 180) return '8馬身';
                 return '大差';
             }
 
@@ -4463,6 +4952,72 @@
                 }
             }
         }
+
+        document.getElementById('copyRaceBtn').addEventListener('click', () => {
+            if (!lastRaceData) return;
+            const { dist, surface, pace, finishedHorses, lapList, last600Time } = lastRaceData;
+            const paceLabel = { slow: 'スロー', middle: 'ミドル', high: 'ハイ', dainige: '大逃げ' }[pace] || pace;
+            const surfLabel = surface === 'dirt' ? 'ダート' : '芝';
+            let text = `【レース内容 ${dist}m ${surfLabel} ${paceLabel}ペース】\n`;
+
+            // 着順
+            const gapToBody = (gap) => {
+                if (gap < 3) return 'ハナ';
+                if (gap < 7) return 'クビ';
+                if (gap < 13) return '1/2馬身';
+                if (gap < 22) return '1馬身';
+                if (gap < 40) return '2馬身';
+                if (gap < 65) return '3馬身';
+                if (gap < 110) return '5馬身';
+                if (gap < 180) return '8馬身';
+                return '大差';
+            };
+            // 全馬を着差(gapFromWinner)順に並べる。これで着差と順位が必ず一致する。
+            // gapFromWinnerは1着ゴール時点の先頭からの距離で全馬に記録済み。
+            const allRanked = (lastRaceData.allHorses || [...finishedHorses]).slice().sort((a, b) => {
+                const ga = a.gapFromWinner ?? (dist - a.run_dist);
+                const gb = b.gapFromWinner ?? (dist - b.run_dist);
+                return ga - gb;
+            });
+
+            text += `\n◆着順（全${allRanked.length}頭）\n`;
+            allRanked.forEach((h, i) => {
+                const po = (h.passOrder && h.passOrder.length > 0) ? h.passOrder.join('-') : '－';
+                let gapInfo = '';
+                if (i === 0) {
+                    gapInfo = '（1着）';
+                } else {
+                    let g = h.gapFromWinner;
+                    if (g === undefined || g === null) g = Math.max(0.1, dist - h.run_dist);
+                    gapInfo = ` 着差:${gapToBody(g)}(${g.toFixed(1)})`;
+                }
+                text += `${i+1}着 ${h.horseNum}番 ${h.name}(${h.type}) 通過順:${po}${gapInfo}\n`;
+            });
+
+            // ラップ
+            if (lapList && lapList.length > 0) {
+                text += `\n◆200mラップ\n`;
+                const laps = lapList.map(l => l.lap.toFixed(1)).join('-');
+                text += laps + '\n';
+                if (last600Time) text += `上がり600m: ${last600Time.toFixed(1)}秒\n`;
+            }
+
+            text += `\nこのレース内容を分析して、バランス改善の提案をしてください。`;
+
+            const copyText = (txt) => {
+                navigator.clipboard.writeText(txt).catch(() => {
+                    const ta = document.createElement('textarea');
+                    ta.value = txt; document.body.appendChild(ta);
+                    ta.select(); document.execCommand('copy');
+                    document.body.removeChild(ta);
+                });
+                const msg = document.getElementById('copyRaceMsg');
+                msg.classList.remove('hidden');
+                msg.textContent = '✅ コピーしました！Claudeのチャットに貼り付けてください。';
+                setTimeout(() => msg.classList.add('hidden'), 4000);
+            };
+            copyText(text);
+        });
 
         nextBtn.addEventListener('click', () => {
             if(money <= 0) return;
