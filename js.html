@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v1.93</span>
+            <span class="text-sm font-bold text-gray-400">v2.07</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -187,6 +187,9 @@
                 </div>
                 
                 <div class="flex flex-col sm:flex-row w-full md:w-auto gap-3">
+                    <button id="allDistSimBtn" class="w-full sm:w-auto bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-600 hover:to-purple-700 text-white font-bold py-3 px-4 rounded-lg text-sm md:text-base transition-all shadow-md transform hover:-translate-y-1 whitespace-nowrap">
+                        🌐 全距離シミュ(各5千回)
+                    </button>
                     <button id="globalSim50kBtn" class="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-4 rounded-lg text-sm md:text-base transition-all shadow-md transform hover:-translate-y-1 whitespace-nowrap">
                         💾 5万回全馬シミュ
                     </button>
@@ -336,7 +339,7 @@
             let r = Math.random();
             let probHigh = 0.33, probMid = 0.34, probSlow = 0.33;
 
-            if (dist <= 1600)       { probHigh = 0.52; probMid = 0.33; probSlow = 0.15; }
+            if (dist <= 1600)       { probHigh = 0.48; probMid = 0.32; probSlow = 0.20; } // スロー増加
             else if (dist <= 2000)  { probHigh = 0.25; probMid = 0.50; probSlow = 0.25; } // 中距離：ハイ25/ミドル50/スロー25
             else if (dist <= 2400)  { probHigh = 0.22; probMid = 0.48; probSlow = 0.30; } // 長距離：ややスロー寄り
             else if (dist >= 3000)  { probHigh = 0.10; probMid = 0.40; probSlow = 0.50; }
@@ -733,14 +736,35 @@
 
                 // 個別調整：シミュレーションで設定勝率を大幅に超える傾向がある馬を抑制
                 const winRateOverride = {
-                    'オグリキャップ': 0.075,
-                    'オオエライジン': 0.045,  // シミュで強すぎるため抑制
-                    'イグナイター':   0.082,
+                    'オグリキャップ': 0.055,  // 24.9%→引き下げ
+                    'オオエライジン': 0.038,
+                    'イグナイター':   0.055,
                     'マジックカーペット': 0.14,
-                    'アウォーディー': 0.092,  // 14.3%設定→28.4%シミュのため抑制
-                    'バズーカ':       0.042,  // 5.8%設定→12.2%シミュのため抑制
-                    'リュウノユキナ': 0.082,  // 11.6%設定→28.5%シミュのため抑制
-                    'ダノンレジェンド': 0.140, // 19.8%設定→27.4%シミュのため微調整
+                    'アウォーディー': 0.092,
+                    'バズーカ':       0.042,
+                    'リュウノユキナ': 0.082,
+                    'ダノンレジェンド': 0.110, // 15.9%→少し抑制
+                    'チャンストウライ': 0.045, // 2400mで36.8%→さらに抑制
+                    'トウケイニセイ':   0.045, // 2400mで24.7%→さらに抑制
+                    'ローゼンホーマ':   0.048, // 2400mで18.9%→さらに抑制
+                    'フェスティバル':   0.050,
+                    'ソリストサンダー': 0.050,
+                    'ブルドッグボス':   0.060, // 21.3%→引き下げ
+                    'フジノウェーブ':   0.050,
+                    'ブルーコンコルド': 0.058, // 29.9%→引き下げ
+                    'タガノジンガロ':   0.055, // 36.3%→新規抑制
+                    'ペプチドナイル':   0.048, // 32.5%→新規抑制
+                    'ドライスタウト':   0.055, // 27.8%→新規抑制
+                    'ケイエスヨシゼン': 0.045, // 820m22.7%→新規抑制
+                    'レッドルゼル':     0.050, // 820m21.9%→新規抑制
+                    'イナリワン':       0.038, // 2400mで49.6%/43.6%→新規抑制
+                    'メグミオウジャ':   0.040, // 2400mで39.4%→新規抑制
+                    'トーホウエンペラー': 0.040, // 2400mで30.8%→新規抑制
+                    'ニホンカイユーノス': 0.042, // 2400mで20.8%→新規抑制
+                    'アラタマワンダー': 0.045, // 2400mで18.7%→新規抑制
+                    'ロジータ':         0.045, // 2400mで30.2%→新規抑制
+                    'テツノカチドキ':   0.045, // 2400mで20.4%→新規抑制
+                    'マキバスナイパー': 0.045, // 2400mで24.6%→新規抑制
                 };
                 if (winRateOverride[name] !== undefined) {
                     baseWinRate = winRateOverride[name] * (0.85 + Math.random() * 0.30);
@@ -2556,10 +2580,16 @@
                         // 前にいる馬はレース後半ほど脚にこたえる（飛ばした分のツケが回る）。
                         let raceProgress = Math.min(1.0, horse.run_dist / total_dist);
                         let frontExtra = (1.0 - Math.min(1.0, distToLeader * 0.012)); // 先頭1.0→離れると0
-                        // 距離が長いほど前で飛ばしたツケが大きい（中長距離はスタミナ勝負）
-                        // ただし2400mは既に全体的な消耗が大きいので過剰にしない
-                        let distScale = total_dist >= 2200 ? 1.1 : (total_dist >= 1700 ? 1.5 : 1.0);
-                        let lateRacePenalty = Math.max(0, raceProgress - 0.40) * 1.5 * distScale; // 中盤以降に強く効く
+                        // 2400m以上は累積疲労を抑制（逃げ・先行の壊滅を防ぐ）。0.75は先頭にさらに不利だったため0.4に戻す
+                        let distScale = total_dist >= 2200 ? 0.4 : (total_dist >= 1700 ? 1.3 : 1.0);
+                        let lateRacePenalty = Math.max(0, raceProgress - 0.40) * 1.5 * distScale;
+                        paceStaminaMod *= (1.0 + frontExtra * lateRacePenalty);
+
+                        // 長距離で後方すぎると、道中のペースに乗れず末脚が削がれる（脚溜まり過ぎ防止）
+                        if (total_dist >= 2000 && distToLeader > 30) {
+                            let rearPenalty = Math.min(0.30, (distToLeader - 30) * 0.010) * raceProgress;
+                            paceStaminaMod *= (1.0 + rearPenalty);
+                        }
                         paceStaminaMod *= (1.0 + frontExtra * lateRacePenalty);
                     }
                 }
@@ -2668,9 +2698,9 @@
                 }
 
                 if (distToLeader > targetDistMax) {
-                    // 長距離ほどcatchUpを強めて馬群を維持（2400mで後方が大差になるのを防ぐ）
+                    // 長距離ほどcatchUpを強めて馬群を維持。ただし強めすぎるとタダ乗りで脚を溜めた強馬が独占する
                     let catchUpRate = total_dist >= 2200
-                        ? (currentCourseId === 'basic' ? 0.0095 : 0.0070)
+                        ? (currentCourseId === 'basic' ? 0.0085 : 0.0062)
                         : (currentCourseId === 'basic' ? 0.0080 : 0.0060);
                     // 先頭が逃げ馬の場合、道中は後続が追いつきにくい（逃げ馬が自分のペースで走れる）
                     if (currentLeader && currentLeader.type === 'nige' && horse !== currentLeader) {
@@ -2816,9 +2846,14 @@
                     let catchUpRate = currentCourseId === 'basic' ? 0.0060 : 0.0038;
 
                     if (!horse.makuriTriggered && (horse.type === 'sashi' || horse.type === 'oikomi') && horse.currentStamina > 25) {
-                        let catchUpMult = currentCourseId === 'sonoda' ? 1.4 : 1.4;
+                        // 長距離（2200m以上）は脚を溜めやすく末脚が効きすぎるため抑制
+                        const longDistCUPenalty = total_dist >= 2200 ? 0.78 : 1.0;
+                        let catchUpMult = (currentCourseId === 'sonoda' ? 1.4 : 1.4) * longDistCUPenalty;
                         // ハイペースは前が消耗→後方の末脚がより際立つ
-                        if (cPace === 'high' || cPace === 'dainige') catchUpMult *= 1.35;
+                        if (cPace === 'high' || cPace === 'dainige') {
+                            const sprintCUPenalty = total_dist < 1000 ? 0.75 : (total_dist < 1400 ? 0.88 : 1.0);
+                            catchUpMult *= 1.35 * sprintCUPenalty;
+                        }
                         catchUpRate *= catchUpMult;
                     }
 
@@ -2884,9 +2919,14 @@
                         // スタミナ残量ボーナス（上限を引き上げ）
                         reserveKire = 1.0 + (horse.currentStamina - 20) * 0.0030;
                         reserveKire = Math.min(1.14, reserveKire);
+                        // 長距離は脚を溜めやすく爆発力が出すぎるため抑制
+                        const longDistKirePenalty = total_dist >= 2200 ? 0.85 : 1.0;
+                        reserveKire = 1.0 + (reserveKire - 1.0) * longDistKirePenalty;
                         // ハイペースなら前が消耗している分、差し追込がさらに有利
                         if (cPace === 'high' || cPace === 'dainige') {
-                            reserveKire *= 1.10;
+                            // 短距離では追込が末脚を活かしにくい（距離が短いため）
+                            const sprintPenalty = total_dist < 1000 ? 0.72 : (total_dist < 1400 ? 0.88 : 1.0);
+                            reserveKire *= 1.10 * sprintPenalty;
                         }
                         reserveKire = Math.min(1.20, reserveKire); // 全体上限
                     }
@@ -3452,7 +3492,7 @@
             const simBaseSpeed = dist / parTime(dist);
             const simPaceWavePhase = Math.random();
             let simPaceTypeFactor = 1.0;
-            if (simPace === 'high') simPaceTypeFactor = 1.006;
+            if (simPace === 'high') simPaceTypeFactor = 1.015;
             else if (simPace === 'dainige') simPaceTypeFactor = 1.004;
             else if (simPace === 'slow') simPaceTypeFactor = 0.992;
 
@@ -3586,7 +3626,7 @@
                         let strengthFactor = cLeader.actualSpeedBase / 1.35;
                         strengthFactor = Math.max(0.94, Math.min(1.06, strengthFactor));
                         let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
-                        const CLOCK_CAL = 0.958;
+                        const CLOCK_CAL = 0.980;
                         let p = dist > 0 ? Math.min(1, frontNow / dist) : 0;
                         let paceShape;
                         if (simPace === 'high' || simPace === 'dainige') {
@@ -3599,7 +3639,8 @@
                         }
                         let paceWave = 0.025 * Math.sin(2 * Math.PI * (2 * p + simPaceWavePhase));
                         let paceProfile = paceShape + paceWave;
-                        let effSpeed = simBaseSpeed * strengthFactor * simPaceTypeFactor * dashClockFactor * CLOCK_CAL * paceProfile;
+                        const shortDistFactor = dist < 1000 ? 1.19 : (dist < 1300 ? 1.05 : 1.0);
+                        let effSpeed = simBaseSpeed * strengthFactor * simPaceTypeFactor * dashClockFactor * CLOCK_CAL * paceProfile * shortDistFactor;
                         simRaceClock += dd / effSpeed;
                     }
                     simLastFrontDist = frontNow;
@@ -3609,11 +3650,12 @@
                         if (remainDd > 0) {
                             let strengthFactor = cLeader.actualSpeedBase / 1.35;
                             strengthFactor = Math.max(0.94, Math.min(1.06, strengthFactor));
-                            const CLOCK_CAL = 0.958;
+                            const CLOCK_CAL = 0.980;
                             let p = 1.0;
                             let paceShape;
                             { let hc = dist >= 2200 ? 0.15 : (dist >= 1700 ? 0.18 : 0.24); if (simPace === 'high' || simPace === 'dainige') paceShape = 1 + hc * (1/3 - p * p); else paceShape = simPace === 'slow' ? 1 + 0.20*(p*p-1/3) : 1 + 0.10*(0.5-p); }
-                            let effSpeed = simBaseSpeed * strengthFactor * simPaceTypeFactor * 1.0 * CLOCK_CAL * paceShape;
+                            const shortDistFactor = dist < 1000 ? 1.19 : (dist < 1300 ? 1.05 : 1.0);
+                            let effSpeed = simBaseSpeed * strengthFactor * simPaceTypeFactor * 1.0 * CLOCK_CAL * paceShape * shortDistFactor;
                             simRaceClock += remainDd / effSpeed;
                         }
                     }
@@ -3676,9 +3718,33 @@
             return selected;
         }
 
-        function downloadCSV(statsObj) {
-            let csvContent = "\uFEFF"; 
-            csvContent += "馬名,コース,距離,脚質,出走回数,1着,2着,3着,4着以下,勝率,連対率,複勝率\n";
+        function buildCsvBody(statsObj, paceGlobalStats) {
+            let csvContent = "";
+            
+            // ペース別集計サマリ
+            const paceLabels = { slow: 'スロー', middle: 'ミドル', high: 'ハイ', dainige: '大逃げ' };
+            const totalRaces = Object.values(paceGlobalStats || {}).reduce((s, v) => s + v.count, 0);
+            csvContent += "【ペース別集計】\n";
+            csvContent += "ペース,レース数,割合,平均勝ちタイム\n";
+            Object.keys(paceLabels).forEach(key => {
+                const ps = (paceGlobalStats || {})[key] || { count: 0, timeSum: 0 };
+                const pct = totalRaces > 0 ? (ps.count / totalRaces * 100).toFixed(1) + "%" : "-";
+                let avgTime = "-";
+                if (ps.count > 0 && ps.timeSum > 0) {
+                    const sec = ps.timeSum / ps.count;
+                    const m = Math.floor(sec / 60);
+                    const s = (sec - m * 60).toFixed(1).padStart(4, '0');
+                    avgTime = `${m}:${s}`;
+                }
+                csvContent += `${paceLabels[key]},${ps.count},${pct},${avgTime}\n`;
+            });
+            csvContent += "\n";
+            
+            // 馬別データ
+            csvContent += "馬名,コース,距離,脚質,出走回数,1着,2着,3着,4着以下,勝率,連対率,複勝率,スロー勝率,ミドル勝率,ハイ勝率,大逃げ勝率,平均着順,勝利時平均着差,異常フラグ\n";
+            
+            // 全体の平均勝率（1レース18頭立ての均等分布: 1/18=5.56%）
+            const avgWinRate = 1 / 18;
             
             let sortedKeys = Object.keys(statsObj).sort((a, b) => statsObj[b].first - statsObj[a].first);
             
@@ -3689,22 +3755,206 @@
                 let rentaiRate = ((st.first + st.second) / st.starts * 100).toFixed(2) + "%";
                 let fukushoRate = ((st.first + st.second + st.third) / st.starts * 100).toFixed(2) + "%";
                 
-                let row = `${name},${COURSES[currentCourseId].name},${total_dist}m,${typeName[st.type]},${st.starts},${st.first},${st.second},${st.third},${st.out},${winRate},${rentaiRate},${fukushoRate}`;
+                // ペース別勝率
+                const pf = st.paceFirst || {slow:0,middle:0,high:0,dainige:0};
+                const ps = st.paceStarts || {slow:0,middle:0,high:0,dainige:0};
+                const slowWR  = ps.slow   > 0 ? (pf.slow   / ps.slow   * 100).toFixed(1) + "%" : "-";
+                const midWR   = ps.middle > 0 ? (pf.middle / ps.middle * 100).toFixed(1) + "%" : "-";
+                const highWR  = ps.high   > 0 ? (pf.high   / ps.high   * 100).toFixed(1) + "%" : "-";
+                const dainiWR = ps.dainige > 0 ? (pf.dainige / ps.dainige * 100).toFixed(1) + "%" : "-";
+                
+                // 平均着順・勝利時平均着差
+                const avgRank = st.rankSum ? (st.rankSum / st.starts).toFixed(1) : "-";
+                const avgMargin = st.winCount > 0 ? (st.winMarginSum / st.winCount).toFixed(1) : "-";
+                
+                // 異常値フラグ
+                let wr = st.first / st.starts;
+                let flag = '';
+                if (wr > avgWinRate * 4) flag = '🔴強すぎ';
+                else if (wr > avgWinRate * 2.5) flag = '🟡やや強い';
+                else if (st.starts >= 500 && wr < avgWinRate * 0.1) flag = '🔵弱すぎ';
+                else if (st.starts >= 200 && wr === 0) flag = '⚪未勝利';
+                
+                let row = `${name},${COURSES[currentCourseId].name},${total_dist}m,${typeName[st.type]},${st.starts},${st.first},${st.second},${st.third},${st.out},${winRate},${rentaiRate},${fukushoRate},${slowWR},${midWR},${highWR},${dainiWR},${avgRank},${avgMargin},${flag}`;
                 csvContent += row + "\n";
             });
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `JSダービー_1万回シミュ_${COURSES[currentCourseId].name}_${total_dist}m.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+
+            return csvContent;
+        }
+
+        function showCsvModal(csvContent) {
+            // モーダルにも表示（コピー用）
+            let modal = document.getElementById('csvModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'csvModal';
+                modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+                modal.innerHTML = `
+                    <div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <h3 style="font-weight:bold;font-size:16px;">📊 シミュ結果CSV</h3>
+                            <button id="csvModalClose" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;">閉じる</button>
+                        </div>
+                        <button id="csvCopyBtn" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:bold;cursor:pointer;font-size:14px;">📋 全てコピー</button>
+                        <textarea id="csvText" style="flex:1;min-height:300px;font-size:11px;font-family:monospace;border:1px solid #e5e7eb;border-radius:8px;padding:8px;resize:vertical;" readonly></textarea>
+                    </div>`;
+                document.body.appendChild(modal);
+                document.getElementById('csvModalClose').addEventListener('click', () => modal.style.display = 'none');
+                document.getElementById('csvCopyBtn').addEventListener('click', () => {
+                    navigator.clipboard.writeText(document.getElementById('csvText').value).then(() => {
+                        document.getElementById('csvCopyBtn').textContent = '✅ コピーしました！';
+                        setTimeout(() => document.getElementById('csvCopyBtn').textContent = '📋 全てコピー', 2000);
+                    }).catch(() => {
+                        document.getElementById('csvText').select();
+                        document.execCommand('copy');
+                        document.getElementById('csvCopyBtn').textContent = '✅ コピーしました！';
+                        setTimeout(() => document.getElementById('csvCopyBtn').textContent = '📋 全てコピー', 2000);
+                    });
+                });
+            }
+            document.getElementById('csvText').value = csvContent;
+            modal.style.display = 'flex';
+        }
+
+        function downloadCSV(statsObj, paceGlobalStats) {
+            let csvContent = "\uFEFF" + buildCsvBody(statsObj, paceGlobalStats);
+
+            // まずダウンロードを試みる
+            try {
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `JSダービー_シミュ_${COURSES[currentCourseId].name}_${total_dist}m.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch(e) {}
+
+            showCsvModal(csvContent);
         }
 
         // --- 5万回全馬シミュレーション＆CSV出力 ---
         const globalSim50kBtn = document.getElementById('globalSim50kBtn');
+
+        // requestIdleCallback がない環境(Safari旧版等)向けのポリフィル
+        const scheduleIdle = typeof requestIdleCallback !== 'undefined'
+            ? (fn) => requestIdleCallback(fn, { timeout: 5000 })
+            : (fn) => setTimeout(fn, 4); // fallback: 4msの空きを作る
+
+        // --- 全距離シミュレーション（現在のコースの全距離を5000回ずつ） ---
+        const allDistSimBtn = document.getElementById('allDistSimBtn');
+
+        allDistSimBtn.addEventListener('click', () => {
+            if (isRacing) return;
+
+            const courseConf = COURSES[currentCourseId];
+            const distList = courseConf.distances.map(d => parseInt(d.value));
+            const savedDist = total_dist; // 元の距離を退避
+
+            const originalText = '🌐 全距離シミュ(各5千回)';
+            allDistSimBtn.innerHTML = `⏳ 距離 1/${distList.length} 準備中...`;
+            allDistSimBtn.disabled = true;
+            globalSim50kBtn.disabled = true;
+            globalSimBtn.disabled = true;
+            simBtn.disabled = true;
+
+            let distIndex = 0;
+            let allCsvBlocks = []; // 距離ごとのCSVテキストを格納
+
+            const simsPerDist = 5000;
+            const batchSize = 10;
+
+            function startNextDistance() {
+                if (distIndex >= distList.length) {
+                    // 全距離完了：結合してモーダル表示
+                    total_dist = savedDist; // 距離を元に戻す
+                    const combined = "\uFEFF" + allCsvBlocks.join("\n\n");
+                    showCsvModal(combined);
+                    allDistSimBtn.innerHTML = originalText;
+                    allDistSimBtn.disabled = false;
+                    globalSim50kBtn.disabled = false;
+                    globalSimBtn.disabled = false;
+                    simBtn.disabled = false;
+                    return;
+                }
+
+                const thisDist = distList[distIndex];
+                total_dist = thisDist; // シミュ対象の距離に切り替え（prepareRandomRaceHorsesが参照）
+
+                let stats = {};
+                let paceGlobalStats = {
+                    slow:   { count: 0, timeSum: 0 },
+                    middle: { count: 0, timeSum: 0 },
+                    high:   { count: 0, timeSum: 0 },
+                    dainige:{ count: 0, timeSum: 0 }
+                };
+                horsesPool.forEach(h => {
+                    stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0,
+                        paceFirst: {slow:0,middle:0,high:0,dainige:0},
+                        paceStarts: {slow:0,middle:0,high:0,dainige:0},
+                        rankSum: 0, winMarginSum: 0, winCount: 0 };
+                });
+
+                let currentSim = 0;
+
+                function runBatch() {
+                    for (let i = 0; i < batchSize && currentSim < simsPerDist; i++) {
+                        let raceHorses = prepareRandomRaceHorses();
+                        let result = simulateRaceComplete(raceHorses, thisDist);
+
+                        const pKey = result.pace === 'dainige' ? 'dainige' : result.pace === 'high' ? 'high' : result.pace === 'slow' ? 'slow' : 'middle';
+                        if (paceGlobalStats[pKey]) {
+                            paceGlobalStats[pKey].count++;
+                            if (result.time > 0) paceGlobalStats[pKey].timeSum += result.time;
+                        }
+                        result.horses.forEach((h, rank) => {
+                            let st = stats[h.name];
+                            if (!st) return;
+                            st.starts++;
+                            st.rankSum += (rank + 1);
+                            st.paceStarts[pKey]++;
+                            if (rank === 0) {
+                                st.first++;
+                                st.paceFirst[pKey]++;
+                                if (result.horses.length > 1) {
+                                    let margin = result.horses[0].run_dist - result.horses[1].run_dist;
+                                    st.winMarginSum += Math.max(0, margin);
+                                    st.winCount++;
+                                }
+                            } else if (rank === 1) st.second++;
+                            else if (rank === 2) st.third++;
+                            else st.out++;
+                        });
+                        currentSim++;
+                    }
+
+                    if (currentSim < simsPerDist) {
+                        allDistSimBtn.innerHTML = `⏳ 距離 ${distIndex+1}/${distList.length} (${thisDist}m) ${currentSim}/${simsPerDist}`;
+                        scheduleIdle(runBatch);
+                    } else {
+                        // この距離の集計完了→CSVテキストを生成して保存
+                        let block = buildCsvBlock(stats, paceGlobalStats, thisDist);
+                        allCsvBlocks.push(block);
+                        distIndex++;
+                        scheduleIdle(startNextDistance);
+                    }
+                }
+
+                scheduleIdle(runBatch);
+            }
+
+            startNextDistance();
+        });
+
+        // downloadCSV内のCSV本文生成ロジックを再利用できるよう関数化
+        function buildCsvBlock(statsObj, paceGlobalStats, distForLabel) {
+            const savedTotalDist = total_dist;
+            total_dist = distForLabel; // CSV内の距離表記に使われるため一時設定
+            let csv = buildCsvBody(statsObj, paceGlobalStats);
+            total_dist = savedTotalDist;
+            return `===== ${COURSES[currentCourseId].name} ${distForLabel}m =====\n` + csv;
+        }
 
         globalSim50kBtn.addEventListener('click', () => {
             if (isRacing) return;
@@ -3714,27 +3964,50 @@
             globalSim50kBtn.disabled = true;
             globalSimBtn.disabled = true;
             simBtn.disabled = true;
-            startBtn.disabled = true;
+            // startBtnはバックグラウンド実行中も使用可
 
             let stats = {};
+            let paceGlobalStats = {
+                slow:   { count: 0, timeSum: 0 },
+                middle: { count: 0, timeSum: 0 },
+                high:   { count: 0, timeSum: 0 },
+                dainige:{ count: 0, timeSum: 0 }
+            };
             horsesPool.forEach(h => {
-                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0 };
+                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0, paceFirst: {slow:0,middle:0,high:0,dainige:0}, paceStarts: {slow:0,middle:0,high:0,dainige:0}, rankSum: 0, winMarginSum: 0, winCount: 0 };
             });
 
             const totalSims = 50000;
             let currentSim = 0;
-            const batchSize = 100; // 大きめのバッチで効率化
+            const batchSize = 20; // 小さいバッチでブラウザが固まらないように
 
             function runBatch50k() {
                 for (let i = 0; i < batchSize && currentSim < totalSims; i++) {
                     let raceHorses = prepareRandomRaceHorses();
                     let result = simulateRaceComplete(raceHorses, total_dist);
 
+                    const pKey = result.pace === 'dainige' ? 'dainige' : result.pace === 'high' ? 'high' : result.pace === 'slow' ? 'slow' : 'middle';
+                    // ペース別レース数・勝ちタイム集計
+                    if (paceGlobalStats[pKey]) {
+                        paceGlobalStats[pKey].count++;
+                        if (result.time > 0) paceGlobalStats[pKey].timeSum += result.time;
+                    }
                     result.horses.forEach((h, rank) => {
                         let st = stats[h.name];
+                        if (!st) return;
                         st.starts++;
-                        if (rank === 0) st.first++;
-                        else if (rank === 1) st.second++;
+                        st.rankSum += (rank + 1);
+                        st.paceStarts[pKey]++;
+                        if (rank === 0) {
+                            st.first++;
+                            st.paceFirst[pKey]++;
+                            // 勝利時の着差（2着との実距離差）
+                            if (result.horses.length > 1) {
+                                let margin = result.horses[0].run_dist - result.horses[1].run_dist;
+                                st.winMarginSum += Math.max(0, margin);
+                                st.winCount++;
+                            }
+                        } else if (rank === 1) st.second++;
                         else if (rank === 2) st.third++;
                         else st.out++;
                     });
@@ -3745,9 +4018,9 @@
                     if (currentSim % 1000 === 0) { // 1000回ごとに表示更新
                         globalSim50kBtn.innerHTML = `⏳ ${currentSim.toLocaleString()} / 50,000`;
                     }
-                    setTimeout(runBatch50k, 0);
+                    scheduleIdle(runBatch50k);
                 } else {
-                    downloadCSV(stats);
+                    downloadCSV(stats, paceGlobalStats);
                     globalSim50kBtn.innerHTML = originalText;
                     globalSim50kBtn.disabled = false;
                     globalSimBtn.disabled = false;
@@ -3756,7 +4029,7 @@
                 }
             }
 
-            setTimeout(runBatch50k, 10);
+            scheduleIdle(runBatch50k);
         });
 
         globalSimBtn.addEventListener('click', () => {
@@ -3766,27 +4039,50 @@
             globalSimBtn.innerHTML = '⏳ 0 / 10000 計算中...';
             globalSimBtn.disabled = true;
             simBtn.disabled = true;
-            startBtn.disabled = true;
+            // startBtnはバックグラウンド実行中も使用可
             
             let stats = {};
+            let paceGlobalStats = {
+                slow:   { count: 0, timeSum: 0 },
+                middle: { count: 0, timeSum: 0 },
+                high:   { count: 0, timeSum: 0 },
+                dainige:{ count: 0, timeSum: 0 }
+            };
             horsesPool.forEach(h => {
-                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0 };
+                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0, paceFirst: {slow:0,middle:0,high:0,dainige:0}, paceStarts: {slow:0,middle:0,high:0,dainige:0}, rankSum: 0, winMarginSum: 0, winCount: 0 };
             });
             
             const totalSims = 10000;
             let currentSim = 0;
-            const batchSize = 50; 
+            const batchSize = 10; // 小さいバッチでブラウザが固まらないように
 
             function runBatch() {
                 for (let i = 0; i < batchSize && currentSim < totalSims; i++) {
                     let raceHorses = prepareRandomRaceHorses();
                     let result = simulateRaceComplete(raceHorses, total_dist);
                     
+                    const pKey = result.pace === 'dainige' ? 'dainige' : result.pace === 'high' ? 'high' : result.pace === 'slow' ? 'slow' : 'middle';
+                    // ペース別レース数・勝ちタイム集計
+                    if (paceGlobalStats[pKey]) {
+                        paceGlobalStats[pKey].count++;
+                        if (result.time > 0) paceGlobalStats[pKey].timeSum += result.time;
+                    }
                     result.horses.forEach((h, rank) => {
                         let st = stats[h.name];
+                        if (!st) return;
                         st.starts++;
-                        if (rank === 0) st.first++;
-                        else if (rank === 1) st.second++;
+                        st.rankSum += (rank + 1);
+                        st.paceStarts[pKey]++;
+                        if (rank === 0) {
+                            st.first++;
+                            st.paceFirst[pKey]++;
+                            // 勝利時の着差（2着との実距離差）
+                            if (result.horses.length > 1) {
+                                let margin = result.horses[0].run_dist - result.horses[1].run_dist;
+                                st.winMarginSum += Math.max(0, margin);
+                                st.winCount++;
+                            }
+                        } else if (rank === 1) st.second++;
                         else if (rank === 2) st.third++;
                         else st.out++;
                     });
@@ -3795,9 +4091,9 @@
 
                 if (currentSim < totalSims) {
                     globalSimBtn.innerHTML = `⏳ ${currentSim} / ${totalSims}`;
-                    setTimeout(runBatch, 0); 
+                    scheduleIdle(runBatch); 
                 } else {
-                    downloadCSV(stats);
+                    downloadCSV(stats, paceGlobalStats);
                     globalSimBtn.innerHTML = originalText;
                     globalSimBtn.disabled = false;
                     simBtn.disabled = false;
@@ -3805,7 +4101,7 @@
                 }
             }
 
-            setTimeout(runBatch, 10);
+            scheduleIdle(runBatch);
         });
 
         simBtn.addEventListener('click', () => {
@@ -3855,7 +4151,7 @@
 
                 if (currentSim < totalSims) {
                     simBtn.innerHTML = `⏳ ${currentSim} / ${totalSims} 計算中...`;
-                    setTimeout(runBatch, 0); 
+                    scheduleIdle(runBatch); 
                 } else {
                     showSimResult(winCounts, placeCounts, paceStats, totalSims);
                     simBtn.innerHTML = originalText;
@@ -4305,7 +4601,7 @@
                     // 距離が長いほどハイ判定を厳しく（中長距離はハイ25/ミドル50/スロー25を目安に）
                     let HIGH_TH, SLOW_TH;
                     if (total_dist <= 1600) {
-                        HIGH_TH = 1.018; SLOW_TH = 0.965;
+                        HIGH_TH = 1.025; SLOW_TH = 0.970; // 短距離もハイになりすぎないよう調整
                     } else if (total_dist <= 2000) {
                         HIGH_TH = 1.040; SLOW_TH = 0.985;
                     } else {
@@ -4350,13 +4646,13 @@
                     let paceSpeedMax = total_dist >= 2200 ? 1.02 : (total_dist >= 1700 ? 1.04 : 1.05);
                     let paceSpeedFactor = Math.max(0.96, Math.min(paceSpeedMax, measuredPaceIndex));
                     let paceTypeFactor = 1.0;
-                    if (currentPace === 'high')      paceTypeFactor = 1.006;
+                    if (currentPace === 'high')      paceTypeFactor = 1.015;
                     else if (currentPace === 'dainige') paceTypeFactor = 1.004;
                     else if (currentPace === 'slow') paceTypeFactor = 0.992;
                     paceSpeedFactor *= paceTypeFactor;
                     // 発走直後は加速途上で時計が遅い（最初の1ハロンが最も遅い）。CLOCK_CALで全体を基準タイムに再校正。
                     let dashClockFactor = frontNow < 200 ? (0.80 + 0.20 * (frontNow / 200)) : 1.0;
-                    const CLOCK_CAL = 0.958;
+                    const CLOCK_CAL = 0.980;
                     // 道中の速度配分（脚質・ペース連動のラップ・プロファイル）。先頭の進捗 p(0→1) で形を変える。
                     // 各形状は区間平均≒1.0に正規化してあるので総タイム(=1:25基準)は変えず、ラップにだけ起伏を作る。
                     // ハイ/大逃げ＝前傾(テン速い→上がり失速)、スロー＝瞬発戦(道中緩い→上がり最速)、ミドル＝緩やかな前傾。
@@ -4374,7 +4670,9 @@
                     // 道中の細かな緩急（2周期の波）。位相はレースごとに変わる。区間積分≒0でタイムは不変。
                     let paceWave = 0.025 * Math.sin(2 * Math.PI * (2 * p + paceWavePhase));
                     let paceProfile = paceShape + paceWave;
-                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor * dashClockFactor * CLOCK_CAL * paceProfile;
+                    // 短距離補正：820mなど超短距離はparTime公式との乖離が大きいため時計を補正
+                    const shortDistFactor = total_dist < 1000 ? 1.19 : (total_dist < 1300 ? 1.05 : 1.0);
+                    let effSpeed = baseSpeed * strengthFactor * paceSpeedFactor * dashClockFactor * CLOCK_CAL * paceProfile * shortDistFactor;
                     raceClock += dd / effSpeed;
                 }
                 lastFrontDist = frontNow;
