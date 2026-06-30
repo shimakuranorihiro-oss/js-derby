@@ -1,1 +1,7 @@
 .claude/
+node_modules/
+package-lock.json
+package.json
+tailwind.config.js
+tw-input.css
+tw-output.css

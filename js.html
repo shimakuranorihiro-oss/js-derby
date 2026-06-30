@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.07</span>
+            <span class="text-sm font-bold text-gray-400">v2.18</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -79,17 +79,18 @@
         </div>
         
         <!-- レース画面（キャンバス） -->
-        <div class="relative rounded-xl overflow-hidden border-4 border-gray-800 shadow-xl mb-6">
+        <div class="relative rounded-xl overflow-hidden border-4 border-gray-800 shadow-xl mb-0">
             <canvas id="raceCanvas" width="1000" height="500"></canvas>
             
             <!-- カメラ視点の切り替えボタン -->
             <button id="cameraToggleBtn" class="absolute bottom-4 right-4 bg-black/60 hover:bg-black/80 text-white font-bold px-4 py-2 rounded-full text-sm backdrop-blur-sm border border-gray-500 transition-colors z-10 flex items-center shadow-lg">
                 <span class="mr-1">🎥</span> 視点: 全体
             </button>
-            
-            <div id="commentary" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-2 rounded-full font-bold text-base md:text-xl hidden backdrop-blur-sm shadow-lg border border-gray-600 transition-all z-10 whitespace-nowrap">
-                レース準備中...
-            </div>
+        </div>
+
+        <!-- 実況テキスト（キャンバス外・下部） -->
+        <div id="commentary" class="hidden bg-gray-900 text-white px-5 py-2 font-bold text-sm md:text-base border-x-4 border-b-4 border-gray-800 rounded-b-xl shadow-lg mb-6 text-center min-h-[36px] transition-all">
+            レース準備中...
         </div>
 
         <!-- 結果発表パネル -->
@@ -736,38 +737,79 @@
 
                 // 個別調整：シミュレーションで設定勝率を大幅に超える傾向がある馬を抑制
                 const winRateOverride = {
-                    'オグリキャップ': 0.055,  // 24.9%→引き下げ
-                    'オオエライジン': 0.038,
-                    'イグナイター':   0.055,
-                    'マジックカーペット': 0.14,
-                    'アウォーディー': 0.092,
-                    'バズーカ':       0.042,
-                    'リュウノユキナ': 0.082,
-                    'ダノンレジェンド': 0.110, // 15.9%→少し抑制
-                    'チャンストウライ': 0.045, // 2400mで36.8%→さらに抑制
-                    'トウケイニセイ':   0.045, // 2400mで24.7%→さらに抑制
-                    'ローゼンホーマ':   0.048, // 2400mで18.9%→さらに抑制
-                    'フェスティバル':   0.050,
-                    'ソリストサンダー': 0.050,
-                    'ブルドッグボス':   0.060, // 21.3%→引き下げ
-                    'フジノウェーブ':   0.050,
-                    'ブルーコンコルド': 0.058, // 29.9%→引き下げ
-                    'タガノジンガロ':   0.055, // 36.3%→新規抑制
-                    'ペプチドナイル':   0.048, // 32.5%→新規抑制
-                    'ドライスタウト':   0.055, // 27.8%→新規抑制
-                    'ケイエスヨシゼン': 0.045, // 820m22.7%→新規抑制
-                    'レッドルゼル':     0.050, // 820m21.9%→新規抑制
-                    'イナリワン':       0.038, // 2400mで49.6%/43.6%→新規抑制
-                    'メグミオウジャ':   0.040, // 2400mで39.4%→新規抑制
-                    'トーホウエンペラー': 0.040, // 2400mで30.8%→新規抑制
-                    'ニホンカイユーノス': 0.042, // 2400mで20.8%→新規抑制
-                    'アラタマワンダー': 0.045, // 2400mで18.7%→新規抑制
-                    'ロジータ':         0.045, // 2400mで30.2%→新規抑制
-                    'テツノカチドキ':   0.045, // 2400mで20.4%→新規抑制
-                    'マキバスナイパー': 0.045, // 2400mで24.6%→新規抑制
+                    // --- 短距離系（820m〜1400m）---
+                    'オグリキャップ':    0.016, // 1870m22-23%→さらに抑制
+                    'イグナイター':      0.030, // 1230m29%→抑制
+                    'マジックカーペット':0.14,
+                    'アウォーディー':    0.050, // 1870m22%🔴→大幅抑制(0.092→0.050)
+                    'バズーカ':          0.042,
+                    'リュウノユキナ':    0.082,
+                    'ダノンレジェンド':  0.040, // 1230m18%→抑制
+                    'タガノジンガロ':    0.026, // 1230m21%→抑制
+                    'コーリンベリー':    0.032, // 1230m32%🔴→大幅抑制
+                    'ブルーコンコルド':  0.022, // 1230m22%→抑制
+                    'ブルドッグボス':    0.022, // 1230m28%/1400m25%🔴→大幅抑制
+                    'レッドルゼル':      0.018, // 1230m28%→抑制
+                    'フジノウェーブ':    0.050,
+                    'フェスティバル':    0.050,
+                    'ソリストサンダー':  0.050,
+                    'ペプチドナイル':    0.025,
+                    'ラブミーチャン':    0.035, // 1230m22%🔴→新規抑制
+                    'メイショウボーラー':0.032, // 1230m24%/1400m23%🔴→新規抑制
+                    'クラウンプライド':  0.040, // 820m22%🔴→新規抑制
+                    // --- 中距離系（1400m〜1870m）---
+                    'エイシンニシパ':    0.040,
+                    'ホッコータルマエ':  0.042,
+                    'オオエライジン':    0.018, // 1400m26%🔴→さらに抑制
+                    'ドライスタウト':    0.018, // 1230m25%/1400m26%🔴→さらに抑制
+                    'ロードバクシン':    0.038, // 1700m27%/1870m24%🔴→新規抑制
+                    'ケイティブレイブ':  0.038, // 1700m27%🔴→新規抑制
+                    'クリソベリル':      0.038, // 1870m25%🔴→新規抑制
+                    'スマートファルコン':0.048, // 1700m18%🟡→新規抑制
+                    'ジンギ':            0.048,
+                    'スマノヒツト':      0.038,
+                    'サンビスタ':        0.040,
+                    'チュウワウィザード':0.042,
+                    'ワンダーアキュート':0.042,
+                    'テーオーケインズ':  0.042,
+                    'アジュディミツオー':0.038,
+                    'トーシンブリザード':0.028,
+                    'タカラアザヤカ':    0.045,
+                    'マキバスナイパー':  0.035,
+                    'ハッピークイン':    0.062,
+                    'オメガパフューム':  0.042,
+                    'ミツアキサイレンス':0.065, // 2400mで圧勝→新規抑制
+                    // --- 長距離系（2400m）---
+                    'ドンレパルス':      0.018, // 2400m38%🔴→新規抑制（緊急）
+                    'イナリワン':        0.008, // 2400m36%→限界まで抑制
+                    'メグミオウジャ':    0.016,
+                    'ニホンカイユーノス':0.014,
+                    'ローゼンホーマ':    0.014,
+                    'コスモバルク':      0.018,
+                    'チャンストウライ':  0.015,
+                    'トウケイニセイ':    0.012,
+                    'ケイエスヨシゼン':  0.010,
+                    'サンバコール':      0.020,
+                    'トーホウエンペラー':0.018,
+                    'マルヨフェニックス':0.022, // 2400m24%🔴→新規抑制
+                    'アラタマワンダー':  0.045,
+                    'ロジータ':          0.045,
+                    'テツノカチドキ':    0.045,
+                    'マツノエース':      0.038,
                 };
                 if (winRateOverride[name] !== undefined) {
                     baseWinRate = winRateOverride[name] * (0.85 + Math.random() * 0.30);
+                    // 根本対策：低override馬は速度・スタミナ・末脚も縮小
+                    // baseConditionのフロア(0.80)を回避し、overrideが実際に効くようにする
+                    // physRefRate=0.025：2400m専門の超低override馬のみに適用（中距離馬への過剰影響を防ぐ）
+                    const physRefRate = 0.025;
+                    const ov = winRateOverride[name];
+                    if (ov < physRefRate) {
+                        const physScale = 0.70 + 0.30 * (ov / physRefRate);
+                        speedBase  *= physScale;
+                        maxStamina *= physScale;
+                        spurt = 1.0 + (spurt - 1.0) * physScale;
+                    }
                 }
 
                 let distMin = dist - 400;
@@ -851,12 +893,13 @@
                 if (horse.surf === 'both') modWinRate *= 0.9; 
                 if (currentSurface === horse.surf) modWinRate *= 1.2;
 
+                // 適性距離レンジ：圏内ボーナス削除、圏外ペナルティも緩和（専門化を抑制）
                 if (total_dist < horse.distMin) {
-                    modWinRate *= 0.4; 
+                    modWinRate *= 0.78; 
                 } else if (total_dist > horse.distMax) {
-                    modWinRate *= 0.3; 
+                    modWinRate *= 0.72; 
                 } else {
-                    modWinRate *= 1.2; 
+                    modWinRate *= 1.0; // 圏内ボーナスなし
                 }
 
                 modWinRate *= horse.condition.winMod;
@@ -866,7 +909,10 @@
 
             currentHorses.forEach(horse => {
                 horse.currentWinRate = horse.currentWinRate / totalWinRate;
-                horse.odds = Math.max(1.1, Math.floor((payoutRate / horse.currentWinRate) * 10) / 10);
+                // オッズ圧縮：理論値80% + 均等20%でブレンドし、極端なオッズを緩和
+                const N = currentHorses.length;
+                const blendedRate = horse.currentWinRate * 0.80 + (1 / N) * 0.20;
+                horse.odds = Math.max(1.1, Math.floor((payoutRate / blendedRate) * 10) / 10);
             });
         }
 
@@ -999,18 +1045,27 @@
         const aiPredictionResult = document.getElementById('aiPredictionResult');
 
         let cameraMode = 'normal'; 
+        let broadcastMode = false;  // TV中継モード
 
         cameraToggleBtn.addEventListener('click', () => {
             if (cameraMode === 'normal') {
                 cameraMode = 'closeup';
+                broadcastMode = false;
                 cameraToggleBtn.innerHTML = '<span class="mr-1">🎥</span> 視点: ズーム';
                 cameraToggleBtn.classList.replace('bg-black/60', 'bg-blue-600/80');
                 cameraToggleBtn.classList.replace('hover:bg-black/80', 'hover:bg-blue-700/80');
+            } else if (cameraMode === 'closeup') {
+                cameraMode = 'broadcast';
+                broadcastMode = true;
+                cameraToggleBtn.innerHTML = '<span class="mr-1">📺</span> 視点: 中継';
+                cameraToggleBtn.classList.replace('bg-blue-600/80', 'bg-red-600/80');
+                cameraToggleBtn.classList.replace('hover:bg-blue-700/80', 'hover:bg-red-700/80');
             } else {
                 cameraMode = 'normal';
+                broadcastMode = false;
                 cameraToggleBtn.innerHTML = '<span class="mr-1">🎥</span> 視点: 全体';
-                cameraToggleBtn.classList.replace('bg-blue-600/80', 'bg-black/60');
-                cameraToggleBtn.classList.replace('hover:bg-blue-700/80', 'hover:bg-black/80');
+                cameraToggleBtn.classList.replace('bg-red-600/80', 'bg-black/60');
+                cameraToggleBtn.classList.replace('hover:bg-red-700/80', 'hover:bg-black/80');
             }
         });
 
@@ -1698,6 +1753,21 @@
                 shakeY = (Math.random() - 0.5) * cameraShakeIntensity;
                 cameraShakeIntensity *= 0.82;
             }
+
+            // === TV中継モード：バックストレッチ区間だけ横ぎ走パース視点に切替 ===
+            // カメラ位置(cameraX/Y/Scale)は上の処理で毎フレーム更新済みなので、
+            // 区間を抜けて通常視点に戻る際もカクツキなく即座に正しい位置で復帰する
+            if (broadcastMode && isRacing && !isCoolDown && photoStep === -1 && leaderHorse) {
+                let bcD = (((start_dist + leaderHorse.run_dist) % C) + C) % C;
+                let cornerArc = Math.PI * R;
+                let backStart = L + cornerArc, backEnd = 2 * L + cornerArc;
+                if (bcD >= backStart && bcD < backEnd) {
+                    ctx.restore();
+                    drawBroadcast();
+                    return;
+                }
+            }
+
             ctx.translate(cameraX + shakeX, cameraY + shakeY);
             ctx.scale(cameraScale, cameraScale);
 
@@ -2558,7 +2628,10 @@
                     // 中長距離は前半飛ばしても勝負所まで脚を溜められる＝消耗は緩和。
                     // 1400m以下:1.0倍 / 中長距離も下限0.70までしか緩めない（消耗戦を維持）
                     let highSeverity;
-                    if (total_dist <= 1400) {
+                    if (total_dist <= 1000) {
+                        // 超短距離（820m等）はハイペースでも全馬バテすぎないよう大幅緩和
+                        highSeverity = 0.48;
+                    } else if (total_dist <= 1400) {
                         // 短距離はスプリント戦＝中長距離ほど前が極端に消耗しない
                         highSeverity = 0.68;
                     } else {
@@ -2847,7 +2920,7 @@
 
                     if (!horse.makuriTriggered && (horse.type === 'sashi' || horse.type === 'oikomi') && horse.currentStamina > 25) {
                         // 長距離（2200m以上）は脚を溜めやすく末脚が効きすぎるため抑制
-                        const longDistCUPenalty = total_dist >= 2200 ? 0.78 : 1.0;
+                        const longDistCUPenalty = total_dist >= 2200 ? 0.58 : 1.0;
                         let catchUpMult = (currentCourseId === 'sonoda' ? 1.4 : 1.4) * longDistCUPenalty;
                         // ハイペースは前が消耗→後方の末脚がより際立つ
                         if (cPace === 'high' || cPace === 'dainige') {
@@ -2920,7 +2993,7 @@
                         reserveKire = 1.0 + (horse.currentStamina - 20) * 0.0030;
                         reserveKire = Math.min(1.14, reserveKire);
                         // 長距離は脚を溜めやすく爆発力が出すぎるため抑制
-                        const longDistKirePenalty = total_dist >= 2200 ? 0.85 : 1.0;
+                        const longDistKirePenalty = total_dist >= 2200 ? 0.60 : 1.0;
                         reserveKire = 1.0 + (reserveKire - 1.0) * longDistKirePenalty;
                         // ハイペースなら前が消耗している分、差し追込がさらに有利
                         if (cPace === 'high' || cPace === 'dainige') {
@@ -3457,6 +3530,8 @@
             let distFactor = 2400 / total_dist;
             // 長距離ほどbaseDrainRateを下げる（distConserveと二重効果）
             if (total_dist > 2400) distFactor = Math.pow(distFactor, 1.12);
+            // 超短距離（1000m未満）は基礎消費が急峻になりすぎるため緩和
+            if (total_dist < 1000) distFactor = 1.0 + (distFactor - 1.0) * 0.70;
             else if (total_dist < 2400) distFactor = Math.pow(distFactor, 0.85);
             const staminaDrainRate = baseDrainRate * distFactor; 
             
@@ -3481,7 +3556,321 @@
         }
 
         // ==========================================
-        // シミュレーション（1000回 / 1万回 共通ロジック）
+        // TV中継モード（競馬中継風パース視点描画）
+        // ==========================================
+        function drawBroadcast() {
+            const W = canvas.width, H = canvas.height;
+            const HORIZON_Y  = H * 0.32;  // 地平線
+            const TRACK_FAR  = HORIZON_Y + 6;    // 遠方レール
+            const TRACK_NEAR = H * 0.91;          // 手前レール
+            const leader = horses.reduce((a,b) => a.run_dist > b.run_dist ? a : b);
+            const leaderDist = leader.run_dist;
+            const leaderV = leader.currentVelocity || 0;
+            const PX = W * 0.0058;  // 距離→ピクセル比
+            const LEADER_X = W * 0.37;
+
+            // 手持ちカメラ風の微振動（速度が出ているほど揺れが強くなる＝スピード感の演出）
+            const handheldT = Date.now() / 95;
+            const shakeAmp = Math.min(2.4, 0.4 + leaderV * 0.10);
+            const jx = Math.sin(handheldT) * shakeAmp;
+            const jy = Math.sin(handheldT * 1.37 + 1.1) * shakeAmp * 0.45;
+
+            ctx.save();
+            ctx.translate(jx, jy);
+
+            // -- 1. 空 --
+            const skyG = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+            skyG.addColorStop(0, '#0d47a1'); skyG.addColorStop(0.6, '#4dabf7'); skyG.addColorStop(1, '#a5d8ff');
+            ctx.fillStyle = skyG; ctx.fillRect(0, 0, W, HORIZON_Y);
+
+            // 雲
+            const ct = Date.now() / 22000;
+            [[0.08+ct%1, 0.28, 65, 20],[0.35+(ct*0.85)%1, 0.16, 90, 25],[0.62+(ct*1.1)%1, 0.32, 58, 17],[0.82+(ct*0.95)%1, 0.20, 75, 22]].forEach(([cx,cy,rx,ry]) => {
+                const x = (cx%1)*W, y = HORIZON_Y*cy;
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                [[0,0,1,1],[rx*0.38,-ry*0.28,0.72,0.72],[-rx*0.33,-ry*0.22,0.62,0.68]].forEach(([dx,dy,sx,sy]) => {
+                    ctx.beginPath(); ctx.ellipse(x+dx, y+dy, rx*sx, ry*sy, 0, 0, Math.PI*2); ctx.fill();
+                });
+            });
+
+            // -- 2. スタンド（観客席）：奥行きのある背景としてゆっくり流れる視差スクロール --
+            const standG = ctx.createLinearGradient(0, HORIZON_Y*0.15, 0, HORIZON_Y);
+            standG.addColorStop(0, '#1e293b'); standG.addColorStop(1, '#334155');
+            ctx.fillStyle = standG; ctx.fillRect(0, HORIZON_Y*0.15, W, HORIZON_Y*0.85);
+            // 屋根
+            ctx.fillStyle = '#0f172a';
+            const roofScroll = (leaderDist * PX * 0.12) % 110;
+            for (let x=-110; x<W+110; x+=110) { ctx.fillRect(x - roofScroll, HORIZON_Y*0.10, 108, HORIZON_Y*0.14); }
+            // 客席の窓（奥の背景なのでゆっくり流れる＝視差効果でスピード感UP）
+            const winScroll = (leaderDist * PX * 0.20) % 26;
+            for (let r=0; r<4; r++) for (let c=-1; c<Math.floor(W/26)+2; c++) {
+                ctx.fillStyle = (c*7+r*11)%5===0 ? 'rgba(255,220,80,0.45)' : ((c*5+r*9)%3===0 ? 'rgba(100,160,255,0.35)' : 'rgba(40,60,90,0.35)');
+                ctx.fillRect(c*26+5 - winScroll, HORIZON_Y*(0.28+r*0.14), 18, 9);
+            }
+            // のぼり旗
+            const fw = Math.sin(Date.now()/380)*2.5;
+            const flagScroll = (leaderDist * PX * 0.20) % 155;
+            ['#ef4444','#3b82f6','#22c55e','#f59e0b','#a855f7','#ec4899'].forEach((fc,fi) => {
+                const fx=60+fi*155 - flagScroll, fy=HORIZON_Y*0.22;
+                ctx.strokeStyle='#64748b'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx,fy-18); ctx.stroke();
+                ctx.fillStyle=fc; ctx.beginPath(); ctx.moveTo(fx,fy-18); ctx.lineTo(fx+13+fw,fy-13); ctx.lineTo(fx+11+fw,fy-8); ctx.lineTo(fx,fy-3); ctx.fill();
+            });
+
+            // -- 3. 地面（トラック面）--
+            const groundG = ctx.createLinearGradient(0, HORIZON_Y, 0, H);
+            if (currentSurface === 'dirt') {
+                groundG.addColorStop(0,'#78350f'); groundG.addColorStop(0.18,'#92400e'); groundG.addColorStop(0.55,'#a85420'); groundG.addColorStop(1,'#c06822');
+            } else {
+                groundG.addColorStop(0,'#14532d'); groundG.addColorStop(0.25,'#166534'); groundG.addColorStop(1,'#16a34a');
+            }
+            ctx.fillStyle = groundG; ctx.fillRect(0, HORIZON_Y, W, H-HORIZON_Y);
+            // 馬場目（芝のみ・実距離に応じて流れる横縞でスピード感を演出）
+            if (currentSurface === 'turf') {
+                const stripeH = (H-HORIZON_Y)/10;
+                const stripeScroll = (leaderDist * PX * 0.55) % (stripeH*2);
+                for (let y = HORIZON_Y - stripeH*2 + stripeScroll; y < H; y += stripeH*2) {
+                    ctx.fillStyle='rgba(0,60,0,0.09)'; ctx.fillRect(0, y, W, stripeH);
+                }
+            } else {
+                for (let i=1; i<=7; i++) { const ly=HORIZON_Y+(H-HORIZON_Y)*i/8; ctx.strokeStyle=`rgba(150,70,15,${0.15+i*0.05})`; ctx.lineWidth=0.4+i*0.3; ctx.beginPath(); ctx.moveTo(0,ly); ctx.lineTo(W,ly); ctx.stroke(); }
+            }
+
+            // -- 4. ラチ（柵）：実際のワールド座標(20m間隔)に固定し、馬の進行と完全連動してスクロール --
+            ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.moveTo(0,TRACK_FAR+4); ctx.lineTo(W,TRACK_FAR+4); ctx.stroke();
+            ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(0,TRACK_NEAR); ctx.lineTo(W,TRACK_NEAR); ctx.stroke();
+            // 柱（パース感：遠方=小、手前=大／実距離20m間隔でワールド固定→速度に応じて流れる）
+            const POST_SPACING_M = 20;
+            const visW0 = leaderDist - LEADER_X / PX;
+            const visW1 = leaderDist + (W - LEADER_X) / PX;
+            const firstPost = Math.floor(visW0 / POST_SPACING_M) * POST_SPACING_M;
+            for (let wx = firstPost; wx <= visW1 + POST_SPACING_M; wx += POST_SPACING_M) {
+                const px = LEADER_X + (wx - leaderDist) * PX;
+                const isRed = Math.round(wx / POST_SPACING_M) % 4 === 0;
+                ctx.fillStyle=isRed?'#ef4444':'#e5e7eb';
+                ctx.fillRect(px-3,TRACK_NEAR-30,6,32);   // 手前
+                ctx.fillStyle=isRed?'#ef4444':'rgba(255,255,255,0.65)';
+                ctx.fillRect(px-1,TRACK_FAR-10,2,11);    // 奥
+            }
+
+            // -- 5. 馬（奥→手前に描く = 内レーン→外レーン）--
+            function laneY(lane) {
+                const t = Math.pow(Math.min(1,Math.max(0,(lane-1)/17)), 0.62);
+                return TRACK_FAR + (TRACK_NEAR-TRACK_FAR)*(0.05 + t*0.89);
+            }
+            function laneScale(lane) {
+                const t = Math.pow(Math.min(1,Math.max(0,(lane-1)/17)), 0.62);
+                return 0.36 + t*0.62;
+            }
+
+            const sortedHorses = [...horses].sort((a,b)=>a.lane-b.lane);
+            sortedHorses.forEach(horse => {
+                const sx = LEADER_X + (horse.run_dist - leaderDist)*PX;
+                if (sx < -160 || sx > W+160) return;
+                const sy = laneY(horse.lane), sc = laneScale(horse.lane);
+                const v = horse.currentVelocity || 0;
+
+                // 影
+                ctx.save(); ctx.globalAlpha=0.2*sc; ctx.fillStyle='#000';
+                ctx.beginPath(); ctx.ellipse(sx+6*sc,sy+5*sc,24*sc,5*sc,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+                // ダスト/スピードトレイル（速度が高いほど顕著に＝実際の速さに連動したスピード感）
+                if (sc > 0.42 && v > 6) {
+                    const trailN = Math.min(4, Math.floor((v-6)*0.7));
+                    for (let ti=1; ti<=trailN; ti++) {
+                        const tAlpha = 0.22 * (1 - ti/(trailN+1)) * sc;
+                        const tx = sx - (16 + ti*9) * sc;
+                        if (currentSurface === 'dirt') {
+                            ctx.fillStyle = `rgba(150,90,40,${tAlpha})`;
+                            ctx.beginPath(); ctx.ellipse(tx, sy+4*sc, (5+ti*1.6)*sc, (2+ti*0.6)*sc, 0, 0, Math.PI*2); ctx.fill();
+                        } else {
+                            ctx.strokeStyle = `rgba(255,255,255,${tAlpha})`;
+                            ctx.lineWidth = 1.4*sc;
+                            ctx.beginPath(); ctx.moveTo(tx, sy-2*sc); ctx.lineTo(tx-7*sc, sy-2*sc); ctx.stroke();
+                        }
+                    }
+                }
+
+                // 馬本体
+                _drawBCHorse(horse, sx, sy, sc);
+
+                // 馬番プレート
+                if (sc>0.52) {
+                    const pw=26*sc, ph=16*sc, px=sx-pw/2, py=sy-50*sc;
+                    ctx.fillStyle=horse.wakuBg; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=1.2;
+                    ctx.beginPath(); ctx.roundRect(px,py,pw,ph,3*sc); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle=horse.wakuText; ctx.font=`bold ${Math.round(10*sc)}px sans-serif`;
+                    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(horse.horseNum,sx,py+ph/2);
+                }
+                // 馬名（上位6頭）
+                const rank=horses.filter(h=>h.run_dist>horse.run_dist).length+1;
+                if (sc>0.62 && rank<=6) {
+                    const nm=horse.name.length>6?horse.name.slice(0,6)+'…':horse.name;
+                    ctx.font=`${Math.round(10*sc)}px sans-serif`;
+                    const tw=ctx.measureText(nm).width+10;
+                    const ny=sy-70*sc;
+                    ctx.fillStyle='rgba(0,0,0,0.78)'; ctx.beginPath(); ctx.roundRect(sx-tw/2,ny,tw,15*sc,3*sc); ctx.fill();
+                    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(nm,sx,ny+7.5*sc);
+                }
+            });
+
+            // ゴール線
+            const distToGoal = total_dist - leaderDist;
+            if (distToGoal < 600 && distToGoal >= -20) {
+                const gsx = LEADER_X + distToGoal * PX;
+                if (gsx>=0 && gsx<=W) {
+                    ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.setLineDash([]);
+                    ctx.beginPath(); ctx.moveTo(gsx,TRACK_FAR); ctx.lineTo(gsx,TRACK_NEAR); ctx.stroke();
+                    ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
+                    ctx.textBaseline='bottom'; ctx.fillText('GOAL',gsx,TRACK_FAR-4);
+                }
+            }
+
+            ctx.restore(); // 手持ちジッター解除（以降のUIオーバーレイは揺れない）
+
+            // -- 6. TV風オーバーレイ --
+            _drawBCOverlay(distToGoal);
+        }
+
+        function _drawBCHorse(horse, cx, cy, sc) {
+            const t = Date.now()/1000;
+            const lf = 5.5 + (horse.currentVelocity||0)*0.4;
+            const ph = t*lf + horse.horseNum*0.9;
+            const ls = Math.sin(ph)*7*sc, bv = Math.abs(Math.sin(ph*2))*1.8*sc, tw = Math.sin(ph*0.6)*4*sc;
+
+            const COATS = [
+                {b:'#92400e',m:'#5c2800',n:'#7a3008'},
+                {b:'#1c0a05',m:'#0f0502',n:'#1a0a04'},
+                {b:'#7c3b1e',m:'#4a1c08',n:'#6a2e14'},
+                {b:'#d0d0d0',m:'#909090',n:'#b0b0b0'},
+                {b:'#c8a030',m:'#886000',n:'#a88020'},
+                {b:'#5c3010',m:'#3a1808',n:'#4a2208'},
+            ];
+            const c = COATS[horse.horseNum % COATS.length];
+
+            ctx.save(); ctx.translate(cx, cy-bv);
+
+            // 胴体
+            ctx.fillStyle=c.b; ctx.beginPath(); ctx.ellipse(0,0,18*sc,8*sc,0,0,Math.PI*2); ctx.fill();
+            // 首
+            ctx.beginPath(); ctx.ellipse(14*sc,-7*sc,7*sc,5*sc,-0.35,0,Math.PI*2); ctx.fill();
+            // 頭
+            ctx.beginPath(); ctx.ellipse(21*sc,-11*sc,6*sc,4.5*sc,-0.25,0,Math.PI*2); ctx.fill();
+            // 鼻先
+            ctx.fillStyle=c.n; ctx.beginPath(); ctx.ellipse(26*sc,-10*sc,3*sc,2.5*sc,0,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(27.2*sc,-10.2*sc,1.2*sc,0.8*sc,0,0,Math.PI*2); ctx.fill();
+            // 目
+            ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(22*sc,-13*sc,1.3*sc,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(22.5*sc,-13.5*sc,0.45*sc,0,Math.PI*2); ctx.fill();
+            // 鬣
+            ctx.fillStyle=c.m;
+            ctx.beginPath(); ctx.moveTo(5*sc,-8*sc); ctx.bezierCurveTo(10*sc,-15*sc,17*sc,-15*sc,20*sc,-13*sc); ctx.lineTo(18*sc,-10*sc); ctx.bezierCurveTo(12*sc,-10*sc,6*sc,-9*sc,4*sc,-8*sc); ctx.fill();
+            // 尻尾
+            ctx.strokeStyle=c.m; ctx.lineWidth=2.5*sc; ctx.lineCap='round';
+            ctx.beginPath(); ctx.moveTo(-18*sc,-2*sc); ctx.bezierCurveTo(-25*sc,tw-8,-27*sc,tw*1.4,-23*sc,tw+7); ctx.stroke();
+            ctx.lineWidth=1.5*sc; ctx.beginPath(); ctx.moveTo(-23*sc,tw+7); ctx.bezierCurveTo(-27*sc,tw+12,-25*sc,tw+16,-21*sc,tw+13); ctx.stroke();
+
+            // 脚
+            ctx.strokeStyle=c.b; ctx.lineWidth=3.5*sc; ctx.lineCap='round';
+            [[10,ls*0.5,7+ls,17],[14,-ls*0.5,17-ls,17],[-8,-ls*0.4,-11-ls*0.8,17],[-4,ls*0.4,-1+ls*0.8,17]].forEach(([x1,cx2,x2,y2]) => {
+                ctx.beginPath(); ctx.moveTo(x1*sc,7*sc); ctx.quadraticCurveTo((x1+cx2)*sc/2,12*sc,x2*sc,y2*sc); ctx.stroke();
+            });
+            // 蹄
+            ctx.fillStyle='#1a0800';
+            [[7+ls,17],[17-ls,17],[-11-ls*0.8,17],[-1+ls*0.8,17]].forEach(([hx,hy]) => {
+                ctx.beginPath(); ctx.ellipse(hx*sc,hy*sc,2.2*sc,1.3*sc,0,0,Math.PI*2); ctx.fill();
+            });
+
+            // 騎手
+            ctx.save(); ctx.translate(3*sc,-13*sc-bv*0.7);
+            ctx.fillStyle=horse.wakuBg;
+            ctx.beginPath(); ctx.ellipse(0,0,5.5*sc,3.5*sc,-0.15,0,Math.PI*2); ctx.fill();
+            // ゼッケン縦線
+            ctx.fillStyle=horse.wakuText; ctx.fillRect(-1.5*sc,-2.5*sc,2*sc,5*sc);
+            // ヘルメット
+            ctx.fillStyle=horse.wakuBg; ctx.beginPath(); ctx.arc(4.5*sc,-3.5*sc,3.8*sc,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='#f1f5f9'; ctx.beginPath(); ctx.arc(5*sc,-4*sc,2.8*sc,0,Math.PI); ctx.fill();
+            ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fillRect(3.5*sc,-5*sc,3*sc,1.8*sc);
+            // 腕
+            ctx.strokeStyle=horse.wakuBg; ctx.lineWidth=2*sc;
+            ctx.beginPath(); ctx.moveTo(4.5*sc,-1*sc); ctx.lineTo(11*sc,1.5*sc+Math.sin(ph)*sc*0.5); ctx.stroke();
+            // 鞭（ムチ打ち時）
+            if (horse.isBattling && isRacing) {
+                const wa=Math.sin(Date.now()/18+horse.horseNum*10);
+                ctx.beginPath(); ctx.moveTo(-1*sc,2*sc); ctx.lineTo(-2+wa*3,7*sc); ctx.stroke();
+                ctx.strokeStyle='rgba(200,200,200,0.8)'; ctx.lineWidth=0.8*sc;
+                ctx.beginPath(); ctx.moveTo(-2+wa*3,7*sc); ctx.lineTo(-5+wa*5,12*sc); ctx.stroke();
+            }
+            ctx.restore();
+
+            // 状態エフェクト（小さいアイコン）
+            if (sc>0.6) {
+                if (horse.isSweating) { ctx.font=`${8*sc}px serif`; ctx.fillText('💦',22*sc,-22*sc); }
+                else if (horse.isBattling) { ctx.font=`${8*sc}px serif`; ctx.fillText('🔥',22*sc,-22*sc); }
+            }
+            ctx.restore();
+        }
+
+        function _drawBCOverlay(distToGoal) {
+            const W=canvas.width, H=canvas.height;
+
+            // --- 左上: レース情報パネル ---
+            ctx.fillStyle='rgba(0,0,0,0.75)';
+            ctx.beginPath(); ctx.roundRect(10,10,200,56,7); ctx.fill();
+            ctx.fillStyle='#fbbf24'; ctx.font='bold 10px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+            ctx.fillText('📺 LIVE', 18,15);
+            ctx.fillStyle='#fff'; ctx.font='bold 15px sans-serif'; ctx.fillText(COURSES[currentCourseId].name, 18, 28);
+            ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif';
+            ctx.fillText(`${total_dist}m  ${currentSurface==='dirt'?'ダート':'芝'}`, 120, 30);
+
+            // --- 右上: 残距離 ---
+            const rem = Math.max(0, Math.round(distToGoal));
+            const isLast = rem < 250;
+            ctx.fillStyle = isLast ? 'rgba(220,30,30,0.9)' : 'rgba(0,0,0,0.78)';
+            ctx.beginPath(); ctx.roundRect(W-155,10,145,46,7); ctx.fill();
+            ctx.fillStyle='#fff'; ctx.font=`bold ${isLast?22:18}px sans-serif`;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText(rem>0?`残り ${rem}m`:'FINISH！', W-82, 33);
+
+            // --- 下部: 現在順位パネル ---
+            const PH=58, PY=H-PH;
+            ctx.fillStyle='rgba(0,0,20,0.85)'; ctx.fillRect(0,PY,W,PH);
+            ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1;
+            ctx.beginPath(); ctx.moveTo(0,PY); ctx.lineTo(W,PY); ctx.stroke();
+
+            ctx.fillStyle='#64748b'; ctx.font='bold 9px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+            ctx.fillText('現在順位', 12, PY+5);
+
+            const sorted=[...horses].sort((a,b)=>b.run_dist-a.run_dist);
+            const SHOW=Math.min(5,sorted.length);
+            const BW=Math.floor((W-20)/SHOW)-5, BH=PH-18;
+            const RANK_COLORS=['#fbbf24','#94a3b8','#b87333','#64748b','#64748b'];
+
+            sorted.slice(0,SHOW).forEach((h,idx)=>{
+                const bx=12+idx*(BW+5), by=PY+16;
+                ctx.fillStyle=h.wakuBg; ctx.beginPath(); ctx.roundRect(bx,by,BW,BH,4); ctx.fill();
+
+                // 順位バッジ
+                ctx.fillStyle=RANK_COLORS[idx]||'#475569'; ctx.beginPath(); ctx.roundRect(bx+2,by+2,18,BH-4,2); ctx.fill();
+                ctx.fillStyle='#000'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(`${idx+1}`,bx+11,by+BH/2);
+
+                // 馬名
+                const nm=h.name.length>5?h.name.slice(0,5):h.name;
+                ctx.fillStyle=h.wakuText; ctx.font=`bold 11px sans-serif`; ctx.textAlign='left'; ctx.textBaseline='top';
+                ctx.fillText(`${h.horseNum}.${nm}`, bx+24, by+3);
+
+                // スタミナバー
+                const sp=h.maxStamina>0?h.currentStamina/h.maxStamina:0;
+                const bw2=BW-26, barY=by+BH-9;
+                ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(bx+24,barY,bw2,5);
+                ctx.fillStyle=sp>0.5?'#22c55e':sp>0.25?'#f59e0b':'#ef4444';
+                ctx.fillRect(bx+24,barY,bw2*Math.max(0,sp),5);
+            });
+        }
+
+        // ==========================================
+        // 通常描画
         // ==========================================
         
         function simulateRaceComplete(raceHorses, dist) {
@@ -3703,9 +4092,10 @@
                 if (horse.surf === 'both') modWinRate *= 0.9; 
                 if (currentSurface === horse.surf) modWinRate *= 1.2;
 
-                if (total_dist < horse.distMin) modWinRate *= 0.4; 
-                else if (total_dist > horse.distMax) modWinRate *= 0.3; 
-                else modWinRate *= 1.2; 
+                // 適性距離レンジ：圏内ボーナス削除、圏外ペナルティも緩和
+                if (total_dist < horse.distMin) modWinRate *= 0.78; 
+                else if (total_dist > horse.distMax) modWinRate *= 0.72; 
+                else modWinRate *= 1.0; 
 
                 modWinRate *= cond.winMod;
                 horse.tmpWinRate = Math.max(0.001, modWinRate); 
@@ -3719,6 +4109,8 @@
         }
 
         function buildCsvBody(statsObj, paceGlobalStats) {
+            // オッズ乖離分析のためのフェアオッズ計算定数
+            const PAYOUT_RATE = 0.75;
             let csvContent = "";
             
             // ペース別集計サマリ
@@ -3741,7 +4133,7 @@
             csvContent += "\n";
             
             // 馬別データ
-            csvContent += "馬名,コース,距離,脚質,出走回数,1着,2着,3着,4着以下,勝率,連対率,複勝率,スロー勝率,ミドル勝率,ハイ勝率,大逃げ勝率,平均着順,勝利時平均着差,異常フラグ\n";
+            csvContent += "馬名,コース,距離,脚質,出走回数,1着,2着,3着,4着以下,勝率,連対率,複勝率,スロー勝率,ミドル勝率,ハイ勝率,大逃げ勝率,平均着順,勝利時平均着差,平均オッズ,フェアオッズ,乖離率,オッズ評価,異常フラグ\n";
             
             // 全体の平均勝率（1レース18頭立ての均等分布: 1/18=5.56%）
             const avgWinRate = 1 / 18;
@@ -3775,7 +4167,18 @@
                 else if (st.starts >= 500 && wr < avgWinRate * 0.1) flag = '🔵弱すぎ';
                 else if (st.starts >= 200 && wr === 0) flag = '⚪未勝利';
                 
-                let row = `${name},${COURSES[currentCourseId].name},${total_dist}m,${typeName[st.type]},${st.starts},${st.first},${st.second},${st.third},${st.out},${winRate},${rentaiRate},${fukushoRate},${slowWR},${midWR},${highWR},${dainiWR},${avgRank},${avgMargin},${flag}`;
+                // オッズ乖離分析
+                const avgOdds = (st.oddsSum && st.starts > 0) ? (st.oddsSum / st.starts).toFixed(1) : '-';
+                const fairOdds = (wr > 0) ? (PAYOUT_RATE / wr).toFixed(1) : '-';
+                let deviation = '-', oddsFlag = '';
+                if (st.oddsSum && wr > 0 && st.starts >= 200) {
+                    const dev = (st.oddsSum / st.starts) / (PAYOUT_RATE / wr);
+                    deviation = dev.toFixed(2);
+                    if (dev >= 2.0) oddsFlag = '💰割高（狙い目）';
+                    else if (dev <= 0.5) oddsFlag = '📉割安（人気過剰）';
+                }
+                
+                let row = `${name},${COURSES[currentCourseId].name},${total_dist}m,${typeName[st.type]},${st.starts},${st.first},${st.second},${st.third},${st.out},${winRate},${rentaiRate},${fukushoRate},${slowWR},${midWR},${highWR},${dainiWR},${avgRank},${avgMargin},${avgOdds},${fairOdds},${deviation},${oddsFlag},${flag}`;
                 csvContent += row + "\n";
             });
 
@@ -3867,9 +4270,20 @@
 
             function startNextDistance() {
                 if (distIndex >= distList.length) {
-                    // 全距離完了：結合してモーダル表示
+                    // 全距離完了：結合してCSVダウンロード＋モーダル表示
                     total_dist = savedDist; // 距離を元に戻す
                     const combined = "\uFEFF" + allCsvBlocks.join("\n\n");
+                    // CSVファイルとしてダウンロード
+                    try {
+                        const blob = new Blob([combined], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", url);
+                        link.setAttribute("download", `JSダービー_全距離シミュ_${courseConf.name}_${new Date().toISOString().slice(0,10)}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } catch(e) {}
                     showCsvModal(combined);
                     allDistSimBtn.innerHTML = originalText;
                     allDistSimBtn.disabled = false;
@@ -3893,7 +4307,8 @@
                     stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0,
                         paceFirst: {slow:0,middle:0,high:0,dainige:0},
                         paceStarts: {slow:0,middle:0,high:0,dainige:0},
-                        rankSum: 0, winMarginSum: 0, winCount: 0 };
+                        rankSum: 0, winMarginSum: 0, winCount: 0,
+                        oddsSum: 0 }; // オッズ集計用
                 });
 
                 let currentSim = 0;
@@ -3901,7 +4316,17 @@
                 function runBatch() {
                     for (let i = 0; i < batchSize && currentSim < simsPerDist; i++) {
                         let raceHorses = prepareRandomRaceHorses();
+                        
                         let result = simulateRaceComplete(raceHorses, thisDist);
+
+                        // オッズ計算: simWinRateは正規化済み（合計=1）
+                        const N = raceHorses.length;
+                        const oddsMap = {};
+                        raceHorses.forEach(h => {
+                            const wr = h.simWinRate || (1/N);
+                            const blended = wr * 0.80 + (1 / N) * 0.20;
+                            oddsMap[h.name] = Math.max(1.1, Math.floor((0.75 / blended) * 10) / 10);
+                        });
 
                         const pKey = result.pace === 'dainige' ? 'dainige' : result.pace === 'high' ? 'high' : result.pace === 'slow' ? 'slow' : 'middle';
                         if (paceGlobalStats[pKey]) {
@@ -3914,6 +4339,7 @@
                             st.starts++;
                             st.rankSum += (rank + 1);
                             st.paceStarts[pKey]++;
+                            st.oddsSum += (oddsMap[h.name] || 0); // オッズ累積
                             if (rank === 0) {
                                 st.first++;
                                 st.paceFirst[pKey]++;
@@ -3974,7 +4400,7 @@
                 dainige:{ count: 0, timeSum: 0 }
             };
             horsesPool.forEach(h => {
-                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0, paceFirst: {slow:0,middle:0,high:0,dainige:0}, paceStarts: {slow:0,middle:0,high:0,dainige:0}, rankSum: 0, winMarginSum: 0, winCount: 0 };
+                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0, paceFirst: {slow:0,middle:0,high:0,dainige:0}, paceStarts: {slow:0,middle:0,high:0,dainige:0}, rankSum: 0, winMarginSum: 0, winCount: 0, oddsSum: 0 };
             });
 
             const totalSims = 50000;
@@ -3984,6 +4410,14 @@
             function runBatch50k() {
                 for (let i = 0; i < batchSize && currentSim < totalSims; i++) {
                     let raceHorses = prepareRandomRaceHorses();
+                    // オッズ計算: simWinRateは正規化済み（合計=1）
+                    const N50 = raceHorses.length;
+                    const oddsMap50 = {};
+                    raceHorses.forEach(h => {
+                        const wr = h.simWinRate || (1/N50);
+                        const blended = wr * 0.80 + (1 / N50) * 0.20;
+                        oddsMap50[h.name] = Math.max(1.1, Math.floor((0.75 / blended) * 10) / 10);
+                    });
                     let result = simulateRaceComplete(raceHorses, total_dist);
 
                     const pKey = result.pace === 'dainige' ? 'dainige' : result.pace === 'high' ? 'high' : result.pace === 'slow' ? 'slow' : 'middle';
@@ -3997,6 +4431,7 @@
                         if (!st) return;
                         st.starts++;
                         st.rankSum += (rank + 1);
+                        st.oddsSum += (oddsMap50[h.name] || 0);
                         st.paceStarts[pKey]++;
                         if (rank === 0) {
                             st.first++;
@@ -4049,7 +4484,7 @@
                 dainige:{ count: 0, timeSum: 0 }
             };
             horsesPool.forEach(h => {
-                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0, paceFirst: {slow:0,middle:0,high:0,dainige:0}, paceStarts: {slow:0,middle:0,high:0,dainige:0}, rankSum: 0, winMarginSum: 0, winCount: 0 };
+                stats[h.name] = { name: h.name, type: h.type, starts: 0, first: 0, second: 0, third: 0, out: 0, paceFirst: {slow:0,middle:0,high:0,dainige:0}, paceStarts: {slow:0,middle:0,high:0,dainige:0}, rankSum: 0, winMarginSum: 0, winCount: 0, oddsSum: 0 };
             });
             
             const totalSims = 10000;
@@ -4445,11 +4880,13 @@
                              : total_dist >= 1870 ? 0.54
                              : total_dist >= 1700 ? 0.60
                              : 0.80;
+                // 短距離(1000m未満)は直線の占める割合が大きいため、スローモーションを軽めにする
+                let finalSpeedFloor = total_dist < 1000 ? 0.32 : 0.18;
                 if (remainToGoal <= finalStraightLen) {
-                    speedMultiplier = 0.18;
+                    speedMultiplier = finalSpeedFloor;
                 } else if (remainToGoal <= finalStraightLen + 300) {
                     let ratio = (remainToGoal - finalStraightLen) / 300;
-                    speedMultiplier = 0.18 + ((midSpeed - 0.18) * ratio);
+                    speedMultiplier = finalSpeedFloor + ((midSpeed - finalSpeedFloor) * ratio);
                 } else if (currentDist < 400) {
                     speedMultiplier = 0.45;
                 } else if (currentDist < 800) {
@@ -5279,15 +5716,22 @@
             });
 
             text += `\n◆着順（全${allRanked.length}頭）\n`;
+            let prevGap = 0;
             allRanked.forEach((h, i) => {
                 const po = (h.passOrder && h.passOrder.length > 0) ? h.passOrder.join('-') : '－';
                 let gapInfo = '';
                 if (i === 0) {
                     gapInfo = '（1着）';
+                    prevGap = 0;
                 } else {
                     let g = h.gapFromWinner;
                     if (g === undefined || g === null) g = Math.max(0.1, dist - h.run_dist);
-                    gapInfo = ` 着差:${gapToBody(g)}(${g.toFixed(1)})`;
+                    const diffFromPrev = Math.max(0, g - prevGap); // 1つ前の馬との着差（表示用）
+                    // 着差の数値表示は最大99.9馬身に制限（シミュ上の極端な値をゲームとして自然に表示）
+                    const displayG    = Math.min(g, 99.9);
+                    const displayDiff = Math.min(diffFromPrev, 99.9);
+                    gapInfo = ` 着差:${gapToBody(diffFromPrev)}(${displayDiff.toFixed(1)}) [1着差:${displayG.toFixed(1)}]`;
+                    prevGap = g;
                 }
                 text += `${i+1}着 ${h.horseNum}番 ${h.name}(${h.type}) 通過順:${po}${gapInfo}\n`;
             });
