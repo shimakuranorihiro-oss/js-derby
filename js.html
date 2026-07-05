@@ -44,7 +44,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.18</span>
+            <span class="text-sm font-bold text-gray-400">v2.27</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -81,16 +81,18 @@
         <!-- レース画面（キャンバス） -->
         <div class="relative rounded-xl overflow-hidden border-4 border-gray-800 shadow-xl mb-0">
             <canvas id="raceCanvas" width="1000" height="500"></canvas>
-            
-            <!-- カメラ視点の切り替えボタン -->
-            <button id="cameraToggleBtn" class="absolute bottom-4 right-4 bg-black/60 hover:bg-black/80 text-white font-bold px-4 py-2 rounded-full text-sm backdrop-blur-sm border border-gray-500 transition-colors z-10 flex items-center shadow-lg">
-                <span class="mr-1">🎥</span> 視点: 全体
-            </button>
         </div>
 
         <!-- 実況テキスト（キャンバス外・下部） -->
-        <div id="commentary" class="hidden bg-gray-900 text-white px-5 py-2 font-bold text-sm md:text-base border-x-4 border-b-4 border-gray-800 rounded-b-xl shadow-lg mb-6 text-center min-h-[36px] transition-all">
+        <div id="commentary" class="hidden bg-gray-900 text-white px-5 py-2 font-bold text-sm md:text-base border-x-4 border-b-4 border-gray-800 rounded-b-xl shadow-lg text-center min-h-[36px] transition-all">
             レース準備中...
+        </div>
+
+        <!-- カメラ視点の切り替えボタン（キャンバス外） -->
+        <div class="flex justify-end mt-2 mb-6">
+            <button id="cameraToggleBtn" class="bg-gray-700 hover:bg-gray-800 text-white font-bold px-4 py-2 rounded-full text-sm border border-gray-500 transition-colors flex items-center shadow">
+                <span class="mr-1">🎥</span> 視点: 全体
+            </button>
         </div>
 
         <!-- 結果発表パネル -->
@@ -1044,28 +1046,38 @@
         const aiPredictionBtn = document.getElementById('aiPredictionBtn');
         const aiPredictionResult = document.getElementById('aiPredictionResult');
 
-        let cameraMode = 'normal'; 
-        let broadcastMode = false;  // TV中継モード
+        let cameraMode = 'closeup';   // デフォルト：ズーム（向正面区間は自動で中継に切替）
+        let broadcastMode = true;     // TV中継モード（向正面で発動）をデフォルトON
+        let bcPanPhase = 0;         // 向正面カメラパンの進行(0=先頭 → 1=最後方 → 先頭へ)
+        let bcPanDir = 1;           // パン方向(1=後方へ / -1=先頭へ戻る)
+        let bcPanStartDist = -1;    // 向正面に入った時点の先頭距離(距離ベースパンの基準)
+        let bcActive = false;       // いま向正面(broadcast)を表示中か
+
+        // ボタンの色をまとめて切り替えるヘルパー（キャンバス外の通常ボタン用）
+        function setCamBtnStyle(label, bgClass, hoverClass) {
+            cameraToggleBtn.className = `${bgClass} ${hoverClass} text-white font-bold px-4 py-2 rounded-full text-sm border border-gray-500 transition-colors flex items-center shadow`;
+            cameraToggleBtn.innerHTML = label;
+        }
+
+        // 初期ボタン表示（デフォルト=中継/ズーム）
+        setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', 'bg-red-600', 'hover:bg-red-700');
 
         cameraToggleBtn.addEventListener('click', () => {
-            if (cameraMode === 'normal') {
-                cameraMode = 'closeup';
-                broadcastMode = false;
-                cameraToggleBtn.innerHTML = '<span class="mr-1">🎥</span> 視点: ズーム';
-                cameraToggleBtn.classList.replace('bg-black/60', 'bg-blue-600/80');
-                cameraToggleBtn.classList.replace('hover:bg-black/80', 'hover:bg-blue-700/80');
-            } else if (cameraMode === 'closeup') {
-                cameraMode = 'broadcast';
-                broadcastMode = true;
-                cameraToggleBtn.innerHTML = '<span class="mr-1">📺</span> 視点: 中継';
-                cameraToggleBtn.classList.replace('bg-blue-600/80', 'bg-red-600/80');
-                cameraToggleBtn.classList.replace('hover:bg-blue-700/80', 'hover:bg-red-700/80');
-            } else {
+            if (cameraMode === 'closeup' && broadcastMode) {
+                // 中継/ズーム → 全体
                 cameraMode = 'normal';
                 broadcastMode = false;
-                cameraToggleBtn.innerHTML = '<span class="mr-1">🎥</span> 視点: 全体';
-                cameraToggleBtn.classList.replace('bg-red-600/80', 'bg-black/60');
-                cameraToggleBtn.classList.replace('hover:bg-red-700/80', 'hover:bg-black/80');
+                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: 全体', 'bg-gray-700', 'hover:bg-gray-800');
+            } else if (cameraMode === 'normal') {
+                // 全体 → ズームのみ（向正面切替なし）
+                cameraMode = 'closeup';
+                broadcastMode = false;
+                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: ズーム', 'bg-blue-600', 'hover:bg-blue-700');
+            } else {
+                // ズームのみ → 中継/ズーム（デフォルトに戻る）
+                cameraMode = 'closeup';
+                broadcastMode = true;
+                setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', 'bg-red-600', 'hover:bg-red-700');
             }
         });
 
@@ -1384,6 +1396,7 @@
             leaderHorse = horses[0];
             finishedHorses = [];
             currentRanking = [...horses];
+            bcPanStartDist = -1; bcPanPhase = 0; bcActive = false;
 
             // 出走馬の顔ぶれ（逃げ馬の数・地力）から前半の流れを創発させる
             earlyPaceBoost = computeEarlyPaceBoost(horses, total_dist);
@@ -1754,19 +1767,28 @@
                 cameraShakeIntensity *= 0.82;
             }
 
-            // === TV中継モード：バックストレッチ区間だけ横ぎ走パース視点に切替 ===
+            // === TV中継モード：向正面（バックストレッチ）区間を横並走パース視点に切替 ===
             // カメラ位置(cameraX/Y/Scale)は上の処理で毎フレーム更新済みなので、
             // 区間を抜けて通常視点に戻る際もカクツキなく即座に正しい位置で復帰する
-            if (broadcastMode && isRacing && !isCoolDown && photoStep === -1 && leaderHorse) {
+            // ゴール後（1頭でも入線したら）は向正面に切り替えず、ゴールシーンを通常視点で見せる
+            if (broadcastMode && isRacing && !isCoolDown && photoStep === -1 && leaderHorse && finishedHorses.length === 0) {
                 let bcD = (((start_dist + leaderHorse.run_dist) % C) + C) % C;
                 let cornerArc = Math.PI * R;
-                let backStart = L + cornerArc, backEnd = 2 * L + cornerArc;
-                if (bcD >= backStart && bcD < backEnd) {
+                // 直線部分の前後にコーナーの大部分(65%)を含めて中継時間を長くする
+                let cornerBleed = cornerArc * 0.65;
+                let backStart = L + cornerArc - cornerBleed;       // 第1コーナー中盤から
+                let backEnd   = 2 * L + cornerArc + cornerBleed;   // 第3コーナー中盤まで
+                // 1400m・2400mはスタート地点が向正面付近のため、序盤300mは全体視点で見せる
+                let skipEarly = (total_dist === 1400 || total_dist === 2400) && leaderHorse.run_dist < 300;
+                if (bcD >= backStart && bcD < backEnd && !skipEarly) {
+                    bcActive = true;
                     ctx.restore();
                     drawBroadcast();
                     return;
                 }
             }
+            bcActive = false;
+            bcPanStartDist = -1;  // 向正面を抜けたらリセット（次に入った時また先頭からパン）
 
             ctx.translate(cameraX + shakeX, cameraY + shakeY);
             ctx.scale(cameraScale, cameraScale);
@@ -3560,14 +3582,38 @@
         // ==========================================
         function drawBroadcast() {
             const W = canvas.width, H = canvas.height;
-            const HORIZON_Y  = H * 0.32;  // 地平線
-            const TRACK_FAR  = HORIZON_Y + 6;    // 遠方レール
-            const TRACK_NEAR = H * 0.91;          // 手前レール
+            const HORIZON_Y  = H * 0.20;  // 地平線（真横寄りの画角＝低めに設定し地面を広く）
+            const TRACK_FAR  = HORIZON_Y + 4;    // 遠方レール（外ラチ＝観客席側）
+            const TRACK_NEAR = H * 0.96;          // 手前レール（内ラチ）
             const leader = horses.reduce((a,b) => a.run_dist > b.run_dist ? a : b);
             const leaderDist = leader.run_dist;
             const leaderV = leader.currentVelocity || 0;
-            const PX = W * 0.0058;  // 距離→ピクセル比
-            const LEADER_X = W * 0.37;
+            const remainToGoal = total_dist - leaderDist;
+
+            // === ズーム率(PX)の決定 ===
+            // 着差表示基準に合わせ 1馬身 ≒ 18 run_dist単位。画面幅に映る馬身数でズームを決める
+            const BODY = 18;  // 1馬身の距離単位
+            // 通常の向正面：画面幅=約2馬身ぶん（＝先頭〜3番手が横一杯に大きく映る）
+            let visibleBodies = 2.0;
+            // 残り500m以内：やや引いて約2.4馬身にして追い比べを見せる
+            if (remainToGoal <= 500) visibleBodies = 2.4;
+            // 800mレースの序盤(200m未満)は従来どおり全体を引いて見せる
+            const is800Early = (total_dist === 820 && leaderDist < 200);
+            if (is800Early) visibleBodies = 9.0;
+
+            const PX = W / (visibleBodies * BODY);   // 距離→ピクセル比
+
+            // === カメラ固定方式：先頭を画面右寄りに保ち、後続馬が右から入って左へ通過していく ===
+            // （中継カメラのように視点を空間に据え、馬群が画面内を流れる構図）
+            let camFocusDist, FOCUS_X;
+            if (is800Early) {
+                camFocusDist = leaderDist;
+                FOCUS_X = W * 0.72;   // 先頭を画面右寄りに
+            } else {
+                camFocusDist = leaderDist;
+                FOCUS_X = W * 0.72;   // 先頭馬を画面右72%に固定（大きい馬でも見切れない）→ 後続は左へ流れる
+            }
+            // 以降 sx = FOCUS_X + (horse.run_dist - camFocusDist) * PX で配置
 
             // 手持ちカメラ風の微振動（速度が出ているほど揺れが強くなる＝スピード感の演出）
             const handheldT = Date.now() / 95;
@@ -3635,37 +3681,48 @@
                 for (let i=1; i<=7; i++) { const ly=HORIZON_Y+(H-HORIZON_Y)*i/8; ctx.strokeStyle=`rgba(150,70,15,${0.15+i*0.05})`; ctx.lineWidth=0.4+i*0.3; ctx.beginPath(); ctx.moveTo(0,ly); ctx.lineTo(W,ly); ctx.stroke(); }
             }
 
-            // -- 4. ラチ（柵）：実際のワールド座標(20m間隔)に固定し、馬の進行と完全連動してスクロール --
+            // -- 4. ラチ（柵）：手前=内ラチ、奥=外ラチ（観客席側）。実ワールド座標(20m間隔)で馬と完全連動 --
+            // 真横画角：馬群は画面中〜下に走るので、内ラチは最下部、外ラチは馬群の奥(上)に置く
+            const RAIL_NEAR_Y = H * 0.99;          // 内ラチ（最手前・最下部）
+            const RAIL_FAR_Y  = TRACK_FAR + 4;     // 外ラチ（奥・観客席際）
             ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.lineWidth=1.5;
-            ctx.beginPath(); ctx.moveTo(0,TRACK_FAR+4); ctx.lineTo(W,TRACK_FAR+4); ctx.stroke();
-            ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(0,TRACK_NEAR); ctx.lineTo(W,TRACK_NEAR); ctx.stroke();
-            // 柱（パース感：遠方=小、手前=大／実距離20m間隔でワールド固定→速度に応じて流れる）
+            ctx.beginPath(); ctx.moveTo(0,RAIL_FAR_Y); ctx.lineTo(W,RAIL_FAR_Y); ctx.stroke(); // 外ラチ（奥・細）
+            ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(0,RAIL_NEAR_Y); ctx.lineTo(W,RAIL_NEAR_Y); ctx.stroke(); // 内ラチ（手前・太）
+            // 柱（手前=内ラチ=大きい、奥=外ラチ=小さい／実距離20m間隔でワールド固定）
             const POST_SPACING_M = 20;
-            const visW0 = leaderDist - LEADER_X / PX;
-            const visW1 = leaderDist + (W - LEADER_X) / PX;
+            const visW0 = camFocusDist - FOCUS_X / PX;
+            const visW1 = camFocusDist + (W - FOCUS_X) / PX;
             const firstPost = Math.floor(visW0 / POST_SPACING_M) * POST_SPACING_M;
             for (let wx = firstPost; wx <= visW1 + POST_SPACING_M; wx += POST_SPACING_M) {
-                const px = LEADER_X + (wx - leaderDist) * PX;
+                const px = FOCUS_X + (wx - camFocusDist) * PX;
                 const isRed = Math.round(wx / POST_SPACING_M) % 4 === 0;
-                ctx.fillStyle=isRed?'#ef4444':'#e5e7eb';
-                ctx.fillRect(px-3,TRACK_NEAR-30,6,32);   // 手前
-                ctx.fillStyle=isRed?'#ef4444':'rgba(255,255,255,0.65)';
-                ctx.fillRect(px-1,TRACK_FAR-10,2,11);    // 奥
+                ctx.fillStyle=isRed?'#ef4444':'#f8fafc';
+                ctx.fillRect(px-3.5,RAIL_NEAR_Y-30,7,32);   // 手前（内ラチ・大）
+                ctx.fillStyle=isRed?'#ef4444':'rgba(255,255,255,0.6)';
+                ctx.fillRect(px-1,RAIL_FAR_Y-9,2,10);    // 奥（外ラチ・小）
             }
 
-            // -- 5. 馬（奥→手前に描く = 内レーン→外レーン）--
+            // -- 5. 馬（右回り向正面：内ラチ(lane=1)が手前、外ラチが奥）--
+            // laneNorm: 0(内ラチ=手前) 〜 1(外ラチ=奥)
+            function laneNorm(lane) {
+                return Math.pow(Math.min(1,Math.max(0,(lane-1)/17)), 0.90);
+            }
             function laneY(lane) {
-                const t = Math.pow(Math.min(1,Math.max(0,(lane-1)/17)), 0.62);
-                return TRACK_FAR + (TRACK_NEAR-TRACK_FAR)*(0.05 + t*0.89);
+                const t = laneNorm(lane);
+                // 馬が大きくなったぶん奥行き帯を最大化し、レーン間のY差を確保して重なりを防ぐ
+                // t=0(内ラチ)→手前(下)、t=1(外ラチ)→奥(上)
+                return TRACK_NEAR - (TRACK_NEAR-TRACK_FAR)*(0.10 + t*0.84);
             }
             function laneScale(lane) {
-                const t = Math.pow(Math.min(1,Math.max(0,(lane-1)/17)), 0.62);
-                return 0.36 + t*0.62;
+                const t = laneNorm(lane);
+                // 馬を大きく表示（手前1.05/奥0.62）。3頭並びで画面いっぱいの迫力に
+                return 1.05 - t*0.43;
             }
 
-            const sortedHorses = [...horses].sort((a,b)=>a.lane-b.lane);
+            // 手前の馬を後に描くため、外レーン(奥)→内レーン(手前)の順でソート
+            const sortedHorses = [...horses].sort((a,b)=>b.lane-a.lane);
             sortedHorses.forEach(horse => {
-                const sx = LEADER_X + (horse.run_dist - leaderDist)*PX;
+                const sx = FOCUS_X + (horse.run_dist - camFocusDist)*PX;
                 if (sx < -160 || sx > W+160) return;
                 const sy = laneY(horse.lane), sc = laneScale(horse.lane);
                 const v = horse.currentVelocity || 0;
@@ -3717,13 +3774,33 @@
             // ゴール線
             const distToGoal = total_dist - leaderDist;
             if (distToGoal < 600 && distToGoal >= -20) {
-                const gsx = LEADER_X + distToGoal * PX;
+                const gsx = FOCUS_X + (total_dist - camFocusDist) * PX;
                 if (gsx>=0 && gsx<=W) {
+                    const gTop = laneY(18), gBot = laneY(1);
                     ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.setLineDash([]);
-                    ctx.beginPath(); ctx.moveTo(gsx,TRACK_FAR); ctx.lineTo(gsx,TRACK_NEAR); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(gsx,gTop); ctx.lineTo(gsx,gBot+8); ctx.stroke();
                     ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
-                    ctx.textBaseline='bottom'; ctx.fillText('GOAL',gsx,TRACK_FAR-4);
+                    ctx.textBaseline='bottom'; ctx.fillText('GOAL',gsx,gTop-4);
                 }
+            }
+
+            // -- 手前の柵（馬より前・最前面）：TV中継で画面下を横切る内ラチ --
+            const FRONT_RAIL_Y = H * 1.005;   // 画面最下部ギリギリ
+            const FRONT_TOP_Y  = TRACK_NEAR + (H - TRACK_NEAR) * 0.35;
+            // 上下2本の白レール
+            ctx.strokeStyle='rgba(255,255,255,0.95)'; ctx.lineWidth=6;
+            ctx.beginPath(); ctx.moveTo(0,FRONT_TOP_Y); ctx.lineTo(W,FRONT_TOP_Y); ctx.stroke();
+            ctx.lineWidth=8;
+            ctx.beginPath(); ctx.moveTo(0,H-4); ctx.lineTo(W,H-4); ctx.stroke();
+            // 手前の柱（大きく・ワールド20m間隔で流れる／奥の柱と半分ずらして視差を出す）
+            for (let wx = firstPost; wx <= visW1 + POST_SPACING_M; wx += POST_SPACING_M) {
+                const px = FOCUS_X + (wx + POST_SPACING_M*0.5 - camFocusDist) * PX;
+                const isRed = Math.round(wx / POST_SPACING_M) % 4 === 0;
+                ctx.fillStyle = isRed ? '#dc2626' : '#ffffff';
+                ctx.fillRect(px-5, FRONT_TOP_Y, 10, H-FRONT_TOP_Y);
+                // 柱の影
+                ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                ctx.fillRect(px+3, FRONT_TOP_Y, 3, H-FRONT_TOP_Y);
             }
 
             ctx.restore(); // 手持ちジッター解除（以降のUIオーバーレイは揺れない）
@@ -3813,6 +3890,53 @@
 
         function _drawBCOverlay(distToGoal) {
             const W=canvas.width, H=canvas.height;
+
+            // --- 上部: 馬群の位置マップ（番号＋枠色マーカーで各馬の位置を表示）---
+            const ovX = 218, ovY = 12, ovW = W - 218 - 168, ovH = 40;
+            if (ovW > 140 && horses.length > 0) {
+                // 背景
+                ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                ctx.beginPath(); ctx.roundRect(ovX, ovY, ovW, ovH, 6); ctx.fill();
+                // 走路ライン
+                const midY = ovY + ovH*0.55;
+                ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+                ctx.lineWidth = ovH*0.5; ctx.beginPath();
+                ctx.moveTo(ovX+8, midY); ctx.lineTo(ovX+ovW-8, midY); ctx.stroke();
+                // ラベル
+                ctx.fillStyle='#94a3b8'; ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+                ctx.fillText('後方', ovX+6, ovY+2);
+                ctx.textAlign='right'; ctx.fillText('先頭 →', ovX+ovW-6, ovY+2);
+
+                // 各馬を隊列位置に応じて配置（左=後方 右=先頭）。同位置の重なりは上下に散らす
+                const leadD = horses.reduce((m,h)=>Math.max(m,h.run_dist),0);
+                const tailD = horses.reduce((m,h)=>Math.min(m,h.run_dist),leadD);
+                const spread = Math.max(30, leadD - tailD);
+                const innerX = ovX+18, innerW = ovW-36;
+                const rSorted = [...horses].sort((a,b)=>a.run_dist-b.run_dist);
+                // x位置ごとの重なりカウンタ
+                let lastX = -999, stackLvl = 0;
+                rSorted.forEach(h => {
+                    const rel = (h.run_dist - tailD) / spread;   // 0=後方 1=先頭
+                    const mx = innerX + innerW * Math.min(1,Math.max(0,rel));
+                    // 近接する馬は上下に少しずらして重なり回避
+                    if (Math.abs(mx - lastX) < 11) stackLvl = (stackLvl+1) % 3;
+                    else stackLvl = 0;
+                    lastX = mx;
+                    const my = midY + (stackLvl-1) * 8;
+                    const isLead = h.run_dist === leadD;
+                    // 枠色の丸マーカー
+                    const rad = isLead ? 8 : 7;
+                    ctx.fillStyle = h.wakuBg || '#e5e7eb';
+                    ctx.strokeStyle = isLead ? '#fbbf24' : 'rgba(255,255,255,0.6)';
+                    ctx.lineWidth = isLead ? 2 : 1;
+                    ctx.beginPath(); ctx.arc(mx, my, rad, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    // 馬番
+                    ctx.fillStyle = h.wakuText || '#000';
+                    ctx.font = `bold ${isLead?9:8}px sans-serif`;
+                    ctx.textAlign='center'; ctx.textBaseline='middle';
+                    ctx.fillText(h.horseNum, mx, my);
+                });
+            }
 
             // --- 左上: レース情報パネル ---
             ctx.fillStyle='rgba(0,0,0,0.75)';
@@ -4911,6 +5035,11 @@
                 }
             }
 
+            // 3着が確定したら、残りの着順(4着・5着…)をほんの少し早めに決める（1.15倍程度）
+            if (finishedHorses.length >= 3) {
+                speedMultiplier = Math.max(speedMultiplier, 1.15);
+            }
+
             horses.forEach(horse => {
                 if (horse.isGoal) {
                     let targetSpeed = horse.actualSpeedBase * 0.6;
@@ -5181,6 +5310,34 @@
             
             const interval = (remain > 400) ? 1200 : 700;
             if (now - lastCommentaryTime < interval) return; 
+
+            // === 向正面（中継カメラ）表示中は、隊列の展開に沿った実況を優先 ===
+            if (bcActive && remain > 350) {
+                const rankAll = [...horses].sort((a,b)=>b.run_dist-a.run_dist);
+                const nHorses = rankAll.length;
+                const typeNames = { nige: '逃げ', senko: '先行', sashi: '差し', oikomi: '追込' };
+                // 先頭・好位・中団・後方を巡回して実況（時間で切り替え）
+                const seg = Math.floor(now / 2500) % 4;
+                let bcText = '';
+                if (seg === 0) {
+                    const lead = rankAll[0], second = rankAll[1];
+                    const gap = second ? Math.floor((lead.run_dist - second.run_dist)/2.5) : 0;
+                    if (gap >= 3) bcText = `先頭は ${lead.name}！ 2番手に${gap}馬身ほどの差をつけて引っ張る。`;
+                    else bcText = `先頭で引っ張るのは ${lead.name}。後続もぴたりと続く展開だ。`;
+                } else if (seg === 1) {
+                    const h = rankAll[Math.min(nHorses-1, 2)];
+                    bcText = `好位につけるのは ${h.name}（${typeNames[h.type]||''}）。虎視眈々と前を窺う。`;
+                } else if (seg === 2) {
+                    const h = rankAll[Math.min(nHorses-1, Math.floor(nHorses*0.5))];
+                    bcText = `中団、${Math.floor(nHorses*0.5)+1}番手あたりに ${h.name}。じっと脚を溜めている。`;
+                } else {
+                    const h = rankAll[nHorses-1];
+                    bcText = `最後方には ${h.name}。ここから大外を回して届くか。`;
+                }
+                commentary.innerText = bcText;
+                lastCommentaryTime = now;
+                return;
+            }
 
             let text = "";
             let type = "";
@@ -5630,7 +5787,13 @@
             for (let i = 0; i < 5; i++) {
                 let h = finishedHorses[i];
                 if (!h) continue;
-                const gapText = i === 0 ? '' : gapToText(h.gapFromWinner ?? 0);
+                // 着差は「1つ前の着順の馬との差」で表示（1-2着差、2-3着差…）
+                let gapText = '';
+                if (i > 0) {
+                    const prev = finishedHorses[i-1];
+                    const diffFromPrev = Math.max(0, (h.gapFromWinner ?? 0) - (prev.gapFromWinner ?? 0));
+                    gapText = gapToText(diffFromPrev);
+                }
                 const gapHtml = gapText ? `<span class="text-xs text-gray-400 ml-2">${gapText}</span>` : '';
                 if (i === 0) {
                     resultHtml += `<div class="text-xl md:text-2xl font-bold text-gray-800 mb-2"><span class="inline-block px-2 py-1 bg-yellow-300 rounded mr-2 border border-yellow-500 text-sm">1着</span> ${h.wakuNum}枠 ${h.horseNum}番 ${h.name}</div>`;
