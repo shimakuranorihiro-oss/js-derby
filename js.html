@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.53</span>
+            <span class="text-sm font-bold text-gray-400">v2.54</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -3730,11 +3730,11 @@
             // 以降 sx = FOCUS_X + (horse._dispDist2 - camFocusDist) * PX で配置（2段平滑化位置を使用）
 
             // 手持ちカメラ風の微振動（速度が出ているほど揺れが強くなる＝スピード感の演出）
-            // 揺れ量を全体的に抑え、ガタついた印象を軽減
+            // 位置ドリフトの補正が入った今は、揺れを少し強めても破綻しないため躍動感重視で増量
             const handheldT = Date.now() / 130;
-            const shakeAmp = Math.min(1.4, 0.25 + leaderV * 0.055);
+            const shakeAmp = Math.min(2.0, 0.4 + leaderV * 0.08);
             const jx = Math.sin(handheldT) * shakeAmp;
-            const jy = Math.sin(handheldT * 1.37 + 1.1) * shakeAmp * 0.45;
+            const jy = Math.sin(handheldT * 1.37 + 1.1) * shakeAmp * 0.5;
 
             ctx.save();
             ctx.translate(jx, jy);
@@ -3853,18 +3853,18 @@
                 ctx.beginPath(); ctx.ellipse(sx+6*sc,sy+5*sc,24*sc,5*sc,0,0,Math.PI*2); ctx.fill(); ctx.restore();
 
                 // ダスト/スピードトレイル（速度が高いほど顕著に＝実際の速さに連動したスピード感）
-                if (sc > 0.42 && v > 6) {
-                    const trailN = Math.min(4, Math.floor((v-6)*0.7));
+                if (sc > 0.42 && v > 5) {
+                    const trailN = Math.min(5, Math.floor((v-5)*0.8)+1);
                     for (let ti=1; ti<=trailN; ti++) {
-                        const tAlpha = 0.22 * (1 - ti/(trailN+1)) * sc;
+                        const tAlpha = 0.30 * (1 - ti/(trailN+1)) * sc;
                         const tx = sx - (16 + ti*9) * sc;
                         if (currentSurface === 'dirt') {
                             ctx.fillStyle = `rgba(150,90,40,${tAlpha})`;
                             ctx.beginPath(); ctx.ellipse(tx, sy+4*sc, (5+ti*1.6)*sc, (2+ti*0.6)*sc, 0, 0, Math.PI*2); ctx.fill();
                         } else {
                             ctx.strokeStyle = `rgba(255,255,255,${tAlpha})`;
-                            ctx.lineWidth = 1.4*sc;
-                            ctx.beginPath(); ctx.moveTo(tx, sy-2*sc); ctx.lineTo(tx-7*sc, sy-2*sc); ctx.stroke();
+                            ctx.lineWidth = 1.8*sc;
+                            ctx.beginPath(); ctx.moveTo(tx, sy-2*sc); ctx.lineTo(tx-8*sc, sy-2*sc); ctx.stroke();
                         }
                     }
                 }
@@ -3976,20 +3976,22 @@
             }
             horse._gallopPhase = (horse._gallopPhase + lf * dt) % (Math.PI * 2);
             const ph = horse._gallopPhase;
-            const bv = Math.pow(Math.sin(ph*2), 2) * 2.0 * sc; // 上下動（滑らかな弾み。sin²で谷の折れ曲がりを解消）
+            const bv = Math.pow(Math.sin(ph*2), 2) * 3.2 * sc; // 上下動（弾み。躍動感を出すため振幅を強化）
 
             // ギャロップ周期(0〜2π)をコマ数にマッピング。
-            // 単純な mod によるサイクル(29→0)だと、30コマが完全に閉じたループになっていない場合
-            // （実際にこの画像はフレーム1と30のポーズが大きく異なり、継ぎ目で毎周期ガクッと
-            // 位置がジャンプしていた）、周期ごとに目立つジャンプが発生してしまう。
-            // 往復(ピンポン)方式にすることで、常に隣接する実コマ同士だけを使い、
-            // 継ぎ目のジャンプを原理的に無くす（0→29→0→29…と滑らかに往復する）。
-            const half = SPRITE_FRAMES - 1;
-            const cyclePos = (ph / (Math.PI*2)) * half * 2; // 0 .. half*2 の範囲を連続的に周回
-            const framePos = cyclePos <= half ? cyclePos : (half * 2 - cyclePos);
-            const idx0 = Math.floor(framePos);
-            const idx1 = Math.min(idx0 + 1, half);
-            const frac = framePos - idx0; // 0〜1：idx0からidx1への遷移度合い
+            // 30コマは実は「5つのポーズ×各6枚のほぼ同じバリエーション」という構造で、
+            // 同じポーズ内の6枚は微妙な描画ゆらぎ(ノイズ)でしかなく、動きの情報を持っていなかった。
+            // 各ポーズの代表1枚(先頭列)だけを採用して5コマに厳選することで、ノイズ由来の
+            // 細かいブレを減らす。往復(ピンポン)方式は維持し、継ぎ目のジャンプも引き続き回避。
+            const SELECTED_FRAME_IDX = [0, 6, 12, 18, 24];
+            const selHalf = SELECTED_FRAME_IDX.length - 1;
+            const selCyclePos = (ph / (Math.PI*2)) * selHalf * 2;
+            const selFramePos = selCyclePos <= selHalf ? selCyclePos : (selHalf * 2 - selCyclePos);
+            const selIdx0 = Math.floor(selFramePos);
+            const selIdx1 = Math.min(selIdx0 + 1, selHalf);
+            const frac = selFramePos - selIdx0; // 0〜1：idx0からidx1への遷移度合い
+            const idx0 = SELECTED_FRAME_IDX[selIdx0];
+            const idx1 = SELECTED_FRAME_IDX[selIdx1];
             const fc0 = idx0 % SPRITE_COLS, fr0 = Math.floor(idx0 / SPRITE_COLS);
             const fc1 = idx1 % SPRITE_COLS, fr1 = Math.floor(idx1 / SPRITE_COLS);
 
