@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.54</span>
+            <span class="text-sm font-bold text-gray-400">v2.55</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -3990,6 +3990,11 @@
             const selIdx0 = Math.floor(selFramePos);
             const selIdx1 = Math.min(selIdx0 + 1, selHalf);
             const frac = selFramePos - selIdx0; // 0〜1：idx0からidx1への遷移度合い
+            // 5コマに間引いた分、1コマの持ち時間が長くなり、ずっと2枚を薄く混ぜた
+            // ぼやけた絵が続いて「動きが乏しい」印象になっていた。遷移の前後は
+            // 前のポーズ/次のポーズをしっかり保持し、中間だけ素早く切り替える
+            // イージングにすることで、ポーズの切り替わりにメリハリを持たせる。
+            const easedFrac = frac < 0.32 ? 0 : frac > 0.68 ? 1 : (frac - 0.32) / 0.36;
             const idx0 = SELECTED_FRAME_IDX[selIdx0];
             const idx1 = SELECTED_FRAME_IDX[selIdx1];
             const fc0 = idx0 % SPRITE_COLS, fr0 = Math.floor(idx0 / SPRITE_COLS);
@@ -4017,18 +4022,18 @@
                 // 線形補間(frac)することで、スプライト画像自体と同じ滑らかさで追従させる。
                 const _anchArr = FRAME_ANCHORS[horse.coat] || FRAME_ANCHORS['bay'];
                 const _a0 = _anchArr[idx0], _a1 = _anchArr[idx1];
-                const anchRx = _a0[0] + (_a1[0] - _a0[0]) * frac;
-                const anchRy = _a0[1] + (_a1[1] - _a0[1]) * frac;
+                const anchRx = _a0[0] + (_a1[0] - _a0[0]) * easedFrac;
+                const anchRy = _a0[1] + (_a1[1] - _a0[1]) * easedFrac;
                 const dx = cx - drawW * anchRx;
                 const dy = cy - drawH * anchRy - bv;
-                ctx.globalAlpha = 1 - frac;
+                ctx.globalAlpha = 1 - easedFrac;
                 ctx.drawImage(
                     spriteImg,
                     fc0*SPRITE_FW, fr0*SPRITE_FH, SPRITE_FW, SPRITE_FH,
                     dx, dy, drawW, drawH
                 );
-                if (frac > 0.02) {
-                    ctx.globalAlpha = frac;
+                if (easedFrac > 0.02) {
+                    ctx.globalAlpha = easedFrac;
                     ctx.drawImage(
                         spriteImg,
                         fc1*SPRITE_FW, fr1*SPRITE_FH, SPRITE_FW, SPRITE_FH,
@@ -4040,14 +4045,14 @@
                 // 帽子を枠順の色でティントして上から重ね描き（キャッシュ済みなので毎フレームの合成コストなし）
                 if (helmetMaskAllReady() && horse.wakuBg) {
                     const helmetSheet = getTintedHelmetSheet(horse.coat, horse.wakuBg);
-                    ctx.globalAlpha = 1 - frac;
+                    ctx.globalAlpha = 1 - easedFrac;
                     ctx.drawImage(
                         helmetSheet,
                         fc0*SPRITE_FW, fr0*SPRITE_FH, SPRITE_FW, SPRITE_FH,
                         dx, dy, drawW, drawH
                     );
-                    if (frac > 0.02) {
-                        ctx.globalAlpha = frac;
+                    if (easedFrac > 0.02) {
+                        ctx.globalAlpha = easedFrac;
                         ctx.drawImage(
                             helmetSheet,
                             fc1*SPRITE_FW, fr1*SPRITE_FH, SPRITE_FW, SPRITE_FH,
