@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.58</span>
+            <span class="text-sm font-bold text-gray-400">v2.59</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2350,7 +2350,7 @@
                     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
                     ctx.lineWidth = 1.2;
                     const ax = pos.x, topY = markerY - 26 - pulse*4;
-                    const aw = 9, ah = 10, shaftW = 4.5, shaftH = 8;
+                    const aw = 4.5, ah = 5, shaftW = 2.25, shaftH = 4;
                     ctx.beginPath();
                     ctx.moveTo(ax, topY + ah + shaftH);
                     ctx.lineTo(ax - aw, topY + ah);
@@ -3863,9 +3863,10 @@
                     ctx.globalAlpha = 0.85 + 0.15*pulse;
                     ctx.fillStyle = '#facc15';
                     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                    ctx.lineWidth = 1.5*sc;
-                    const ax = sx, topY = sy - 60*sc - pulse*5*sc;
-                    const aw = 16*sc, ah = 20*sc, shaftW = 8*sc, shaftH = 14*sc;
+                    ctx.lineWidth = 1.2*sc;
+                    // 騎手の頭に被らないよう、さらに高い位置に表示
+                    const ax = sx, topY = sy - 82*sc - pulse*5*sc;
+                    const aw = 8*sc, ah = 10*sc, shaftW = 4*sc, shaftH = 7*sc;
                     ctx.beginPath();
                     ctx.moveTo(ax, topY + ah + shaftH);          // 先端（下）
                     ctx.lineTo(ax - aw, topY + ah);               // 左羽根
