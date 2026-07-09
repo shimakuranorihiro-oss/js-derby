@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.52</span>
+            <span class="text-sm font-bold text-gray-400">v2.53</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -3827,7 +3827,12 @@
                 const t = laneNorm(lane);
                 // 馬が大きいので配置帯を画面中〜下に集約しつつ、レーン間Y差を確保
                 // t=0(内ラチ)→手前(下)、t=1(外ラチ)→奥(上)。手前馬が下の柵に食い込まない高さに
-                return TRACK_NEAR - 30 - (TRACK_NEAR-TRACK_FAR)*(0.05 + t*0.72);
+                // ※配置アンカーを「馬体全体の重心」から「帽子(頭)の位置」に変更した際、
+                // アンカーが上寄りになった分、体全体が相対的に下へ伸びて表示されるようになった。
+                // その分を近い(大きい)レーンほど多めに補正して引き上げる。
+                const approxSc = 1.7 - t*0.75; // laneScaleと同じ式
+                const anchorShiftComp = 32 * approxSc;
+                return TRACK_NEAR - 30 - (TRACK_NEAR-TRACK_FAR)*(0.05 + t*0.72) - anchorShiftComp;
             }
             function laneScale(lane) {
                 const t = laneNorm(lane);
@@ -3867,8 +3872,11 @@
                 // 馬本体
                 _drawBCHorse(horse, sx, sy, sc);
 
-                // 馬名ラベル（全頭・頭上に表示）：胴体バッジを廃止した分、番号確認はここに一本化
-                if (sc>0.5) {
+                // 馬名ラベル（先頭付近の馬のみ・頭上に表示）：全頭表示すると密集時にラベルが
+                // 重なり合って「数字がつらつら並ぶ」ような見づらい状態になっていたため、
+                // 表示数を絞る（sc=画面上の大きさでも判定し、小さく重なりやすい奥の馬は省く）
+                const _rank = horses.filter(h=>h.run_dist>horse.run_dist).length+1;
+                if (sc>0.75 && _rank<=8) {
                     const nm=horse.name.length>6?horse.name.slice(0,6)+'…':horse.name;
                     ctx.font=`bold ${Math.round(11*sc)}px sans-serif`;
                     const tw=ctx.measureText(nm).width+14;
