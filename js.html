@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.56</span>
+            <span class="text-sm font-bold text-gray-400">v2.57</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1019,6 +1019,8 @@
         let prevLeader = null;
         let lastCommentaryTime = 0;
         let lastCommentaryType = "";
+        let spotlightHorse = null;   // 実況で今言及されている馬（中継画面でマークを表示する）
+        let spotlightUntil = 0;
         
         let gateOffset = 0;
         let isGateMoving = false;
@@ -2665,7 +2667,7 @@
                     if (shouldMakuri && Math.random() < executeProb) {
                         horse.makuriTriggered = true;
                         if (!isSim && !makuriAnnounced) {
-                            commentary.innerText = `おっと！ここで ${horse.name} が外から動いていった！`;
+                            setCommentary(`おっと！ここで ${horse.name} が外から動いていった！`);
                             lastCommentaryTime = Date.now();
                             makuriAnnounced = true;
                         }
@@ -3831,11 +3833,32 @@
                 // 馬本体
                 _drawBCHorse(horse, sx, sy, sc);
 
-                // 馬名ラベル（先頭付近の馬のみ・頭上に表示）：全頭表示すると密集時にラベルが
-                // 重なり合って「数字がつらつら並ぶ」ような見づらい状態になっていたため、
-                // 表示数を絞る（sc=画面上の大きさでも判定し、小さく重なりやすい奥の馬は省く）
+                // 実況で今言及している馬にマーク（スポットライト）を表示
+                const _isSpotlight = (horse === spotlightHorse) && (Date.now() < spotlightUntil);
+                if (_isSpotlight) {
+                    const pulse = 0.5 + 0.5*Math.sin(Date.now()/140);
+                    ctx.save();
+                    ctx.globalAlpha = 0.55 + 0.35*pulse;
+                    ctx.strokeStyle = '#fde047';
+                    ctx.lineWidth = (2.5 + 1.5*pulse) * sc;
+                    ctx.beginPath();
+                    ctx.ellipse(sx, sy - 4*sc, 34*sc, 20*sc, 0, 0, Math.PI*2);
+                    ctx.stroke();
+                    // 上から指す矢印
+                    ctx.globalAlpha = 0.9;
+                    ctx.fillStyle = '#fde047';
+                    const ax = sx, ay = sy - 34*sc - pulse*4*sc;
+                    ctx.beginPath();
+                    ctx.moveTo(ax, ay+10*sc); ctx.lineTo(ax-7*sc, ay-4*sc); ctx.lineTo(ax+7*sc, ay-4*sc);
+                    ctx.closePath(); ctx.fill();
+                    ctx.restore();
+                }
+
+                // 馬名ラベル（先頭付近の馬のみ・頭上に表示。スポットライト中の馬は常に表示）：
+                // 全頭表示すると密集時にラベルが重なり合って「数字がつらつら並ぶ」ような
+                // 見づらい状態になっていたため、表示数を絞る
                 const _rank = horses.filter(h=>h.run_dist>horse.run_dist).length+1;
-                if (sc>0.75 && _rank<=8) {
+                if ((sc>0.75 && _rank<=8) || _isSpotlight) {
                     const nm=horse.name.length>6?horse.name.slice(0,6)+'…':horse.name;
                     ctx.font=`bold ${Math.round(11*sc)}px sans-serif`;
                     const tw=ctx.measureText(nm).width+14;
@@ -3954,7 +3977,10 @@
             // ぼやけた絵が続いて「動きが乏しい」印象になっていた。遷移の前後は
             // 前のポーズ/次のポーズをしっかり保持し、中間だけ素早く切り替える
             // イージングにすることで、ポーズの切り替わりにメリハリを持たせる。
-            const easedFrac = frac < 0.32 ? 0 : frac > 0.68 ? 1 : (frac - 0.32) / 0.36;
+            // 元の12コマは元々滑らかなアニメーションなので、保持→素早く切替のイージングは不要。
+            // （このイージングは5コマに間引いていた際の対策だったが、実コマ同士が近い元の絵では
+            // 逆にパッと切り替わるチラつきの原因になるため、素直な線形クロスフェードに戻す）
+            const easedFrac = frac;
             const idx0 = SELECTED_FRAME_IDX[selIdx0];
             const idx1 = SELECTED_FRAME_IDX[selIdx1];
             const fc0 = idx0 % SPRITE_COLS, fr0 = Math.floor(idx0 / SPRITE_COLS);
@@ -5066,7 +5092,7 @@
             isWaitingStart = true;
             waitingTicks = 0; 
             
-            commentary.innerText = "態勢完了。ゲートオープンまでお待ちください...";
+            setCommentary("態勢完了。ゲートオープンまでお待ちください...");
             
             function waitingLoop() {
                 if (isWaitingStart) {
@@ -5092,9 +5118,9 @@
 
                 // まずは好スタートを伝える
                 if (goodStarters.length > 0) {
-                    commentary.innerText = `各馬一斉にスタート！ ${goodStarters[0].name} が好発進だ！ ${courseName} ${surfaceText}${total_dist}m、号砲が鳴った！`;
+                    setCommentary(`各馬一斉にスタート！ ${goodStarters[0].name} が好発進だ！ ${courseName} ${surfaceText}${total_dist}m、号砲が鳴った！`);
                 } else {
-                    commentary.innerText = `各馬一斉にスタート！ ${courseName} ${surfaceText}${total_dist}mの戦いが始まった！`;
+                    setCommentary(`各馬一斉にスタート！ ${courseName} ${surfaceText}${total_dist}mの戦いが始まった！`);
                 }
                 // updateCommentaryの汎用スタート文での上書きを防ぎ、次の実況まで少し間を取る
                 announcedPhases['start'] = true;
@@ -5108,7 +5134,7 @@
                         : `おっと！ ${w.name} が出遅れた！ ここから巻き返せるか！？`;
                     setTimeout(() => {
                         if (isRacing && finishedHorses.length === 0) {
-                            commentary.innerText = lateMsg;
+                            setCommentary(lateMsg);
                             lastCommentaryTime = Date.now();
                         }
                     }, 1500);
@@ -5253,19 +5279,19 @@
                         if (gap <= 3.0) {
                             isPhotoFinishTriggered = true;
                             cameraShakeIntensity = 8;
-                            commentary.innerText = `ゴーーール！！ 1着争いは大接戦！ 写真判定か！？`;
+                            setCommentary(`ゴーーール！！ 1着争いは大接戦！ 写真判定か！？`);
                         } else if (gap < 8) {
                             const lines = [
                                 `ゴーーール！！ 激しい叩き合いを制したのは ${horse.name}！！`,
                                 `${horse.name}！！ 際どい叩き合いをクビ差制した！！`,
                             ];
-                            commentary.innerText = lines[Math.floor(Math.random() * lines.length)];
+                            setCommentary(lines[Math.floor(Math.random() * lines.length)]);
                         } else if (gap > 25) {
                             const lines = [
                                 `${horse.name}！！ 他馬を突き放して圧勝！！ 強い！！`,
                                 `${horse.name} が独走！！ 後続に大差をつけてゴール！！`,
                             ];
-                            commentary.innerText = lines[Math.floor(Math.random() * lines.length)];
+                            setCommentary(lines[Math.floor(Math.random() * lines.length)]);
                         } else {
                             const lines = (currentCourseId === 'sonoda') ? [
                                 `ゴールイン！ 園田を制したのは ${horse.name}だァ！ 見事な走りっぷりッ！`,
@@ -5276,29 +5302,29 @@
                                 `${horse.name}！！ ${horse.skillName} でゴールを制した！！`,
                                 `勝ったのは ${horse.name}！！ 見事な走りでした！！`,
                             ];
-                            commentary.innerText = lines[Math.floor(Math.random() * lines.length)];
+                            setCommentary(lines[Math.floor(Math.random() * lines.length)]);
                         }
                         lastCommentaryTime = Date.now();
                     } else if (order === 2) {
                         if (!isPhotoFinishTriggered) {
                             const lines = [`2着に ${horse.name} が入りました！`, `惜しくも2着は ${horse.name}！`];
-                            commentary.innerText = lines[Math.floor(Math.random() * lines.length)];
+                            setCommentary(lines[Math.floor(Math.random() * lines.length)]);
                             lastCommentaryTime = Date.now();
                         }
                     } else if (order === 3) {
                         if (!isPhotoFinishTriggered) {
                             const lines = [`3着は ${horse.name}！`, `${horse.name} が3着に入線！`];
-                            commentary.innerText = lines[Math.floor(Math.random() * lines.length)];
+                            setCommentary(lines[Math.floor(Math.random() * lines.length)]);
                             lastCommentaryTime = Date.now();
                         }
                     } else if (order === 4) {
                         if (!isPhotoFinishTriggered) {
-                            commentary.innerText = `続いて4着に ${horse.name}。`;
+                            setCommentary(`続いて4着に ${horse.name}。`);
                             lastCommentaryTime = Date.now();
                         }
                     } else if (order === 5) {
                         if (!isPhotoFinishTriggered) {
-                            commentary.innerText = `そして5着に ${horse.name} が入線！`;
+                            setCommentary(`そして5着に ${horse.name} が入線！`);
                             lastCommentaryTime = Date.now();
                         }
                     }
@@ -5461,6 +5487,31 @@
             }
         }
 
+        // 実況テキストに馬名が含まれていたら「番号+名前」表記に変換し、
+        // その馬に中継画面上でマーク（スポットライト）を表示する。
+        // commentary.innerText への直接代入をすべてこの関数経由に統一する。
+        function setCommentary(str) {
+            if (!str) { commentary.innerText = str; return; }
+            let matched = null;
+            if (typeof horses !== 'undefined' && horses) {
+                for (const h of horses) {
+                    if (!h || !h.name) continue;
+                    const tag = `${h.horseNum}番 ${h.name}`;
+                    if (str.includes(tag)) { if (!matched) matched = h; continue; } // 既に番号付き
+                    if (str.includes(h.name)) {
+                        const esc = h.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        str = str.replace(new RegExp(esc, 'g'), tag);
+                        if (!matched) matched = h;
+                    }
+                }
+            }
+            if (matched) {
+                spotlightHorse = matched;
+                spotlightUntil = Date.now() + 3200;
+            }
+            commentary.innerText = str;
+        }
+
         function updateCommentary() {
             if (finishedHorses.length > 0) return; 
 
@@ -5493,7 +5544,7 @@
                     const h = rankAll[nHorses-1];
                     bcText = `最後方には ${h.name}。ここから大外を回して届くか。`;
                 }
-                commentary.innerText = bcText;
+                setCommentary(bcText);
                 lastCommentaryTime = now;
                 return;
             }
@@ -5742,7 +5793,7 @@
             prevLeader = top1;
 
             if (text && text !== commentary.innerText) {
-                commentary.innerText = text;
+                setCommentary(text);
                 nowCommentaryTime = now;
                 lastCommentaryTime = now;
                 if (type) lastCommentaryType = type;
@@ -5851,7 +5902,7 @@
                         isRacing = true;
                         raceLoop();
                         
-                        commentary.innerText = `写真判定の結果... 1着は見事 ${winner.horseNum}番 ${winner.name} です！`;
+                        setCommentary(`写真判定の結果... 1着は見事 ${winner.horseNum}番 ${winner.name} です！`);
                         setTimeout(() => { 
                             isRacing = false;
                             showResult(winner, betHorseName, betAmount); 
@@ -5877,13 +5928,13 @@
             };
             if (isPhotoFinishTriggered) {
                 isRacing = false; 
-                commentary.innerText = `1着争いは大接戦！ 写真判定の確認に入ります！`;
+                setCommentary(`1着争いは大接戦！ 写真判定の確認に入ります！`);
                 setTimeout(() => {
                     showPhotoFinishEffect(winner, betHorseName, betAmount, winner.finishFrame);
                 }, 1500);
             } else {
                 isCoolDown = true;
-                commentary.innerText = `以上、上位5頭の入線をお伝えしました。素晴らしいレースでした！`;
+                setCommentary(`以上、上位5頭の入線をお伝えしました。素晴らしいレースでした！`);
                 
                 setTimeout(() => {
                     isRacing = false; 
