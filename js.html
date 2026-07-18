@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.68</span>
+            <span class="text-sm font-bold text-gray-400">v2.69</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1923,7 +1923,7 @@
                             let bcSpeed = deltaBcD / deltaT; // コース距離/秒
                             let remaining = backEnd - bcD;
                             let timeToExit = remaining / bcSpeed;
-                            bcFadeAlpha = timeToExit <= 3 ? Math.min(1, Math.max(0, 1 - timeToExit/3)) : 0;
+                            bcFadeAlpha = timeToExit <= 1 ? Math.min(1, Math.max(0, 1 - timeToExit/1)) : 0;
                         }
                     }
                     _lastBcD = bcD; _lastBcDTime = _now;
@@ -2664,7 +2664,7 @@
 
             // 向正面から通常視点に戻った直後、黒→透明へ約0.8秒かけてフェードイン
             if (bcFadeInStart !== null) {
-                const elapsed = (Date.now() - bcFadeInStart) / 800;
+                const elapsed = (Date.now() - bcFadeInStart) / 350;
                 bcFadeAlpha = Math.max(0, 1 - elapsed);
                 if (bcFadeAlpha <= 0) { bcFadeAlpha = 0; bcFadeInStart = null; }
             }
@@ -4233,11 +4233,18 @@
                 const tailD = horses.reduce((m,h)=>Math.min(m,h.run_dist),leadD);
                 const spread = Math.max(30, leadD - tailD);
                 const innerX = ovX+18, innerW = ovW-36;
-                const rSorted = [...horses].sort((a,b)=>a.run_dist-b.run_dist);
+                // 生のrun_distをそのまま使うと僅かな揺らぎでマーカーがちらつくため、
+                // 表示用の位置(_miniMapRel)を平滑化してから並べ替え・配置する
+                horses.forEach(h => {
+                    const relRaw = (h.run_dist - tailD) / spread;
+                    if (h._miniMapRel === undefined) h._miniMapRel = relRaw;
+                    h._miniMapRel += (relRaw - h._miniMapRel) * Math.min(1, (_frameDt||0.016) * 6);
+                });
+                const rSorted = [...horses].sort((a,b)=>a._miniMapRel-b._miniMapRel);
                 // x位置ごとの重なりカウンタ
                 let lastX = -999, stackLvl = 0;
                 rSorted.forEach(h => {
-                    const rel = (h.run_dist - tailD) / spread;   // 0=後方 1=先頭
+                    const rel = h._miniMapRel;   // 0=後方 1=先頭（平滑化済み）
                     const mx = innerX + innerW * Math.min(1,Math.max(0,rel));
                     // 近接する馬は上下に少しずらして重なり回避
                     if (Math.abs(mx - lastX) < 11) stackLvl = (stackLvl+1) % 3;
