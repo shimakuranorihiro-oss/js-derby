@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.75</span>
+            <span class="text-sm font-bold text-gray-400">v2.76</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1173,6 +1173,7 @@
 
         let cameraMode = 'closeup';   // デフォルト：ズーム（向正面区間は自動で中継に切替）
         let broadcastMode = true;     // TV中継モード（向正面で発動）をデフォルトON
+        let homeStretchMirrorEnabled = true; // 最後の直線での反転視点をデフォルトON（OFFでv2.74までの向正面のみ挙動）
         let bcPanPhase = 0;         // 向正面カメラパンの進行(0=先頭 → 1=最後方 → 先頭へ)
         let bcPanDir = 1;           // パン方向(1=後方へ / -1=先頭へ戻る)
         let bcPanStartDist = -1;    // 向正面に入った時点の先頭距離(距離ベースパンの基準)
@@ -1187,24 +1188,30 @@
             cameraToggleBtn.innerHTML = label;
         }
 
-        // 初期ボタン表示（デフォルト=中継/ズーム）
+        // 初期ボタン表示（デフォルト=中継/ズーム、直線反転あり）
         setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', 'bg-red-600', 'hover:bg-red-700');
 
+        // 視点は3段階でループ：
+        // 1) 中継/ズーム（向正面＋最後の直線を反転視点で表示）
+        // 2) 中継/ズーム（向正面のみ。最後の直線は反転視点にせず従来通り）＝v2.74までの挙動
+        // 3) ズームのみ（向正面/直線の切替なし）
         cameraToggleBtn.addEventListener('click', () => {
-            if (cameraMode === 'closeup' && broadcastMode) {
-                // 中継/ズーム → 全体
-                cameraMode = 'normal';
-                broadcastMode = false;
-                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: 全体', 'bg-gray-700', 'hover:bg-gray-800');
-            } else if (cameraMode === 'normal') {
-                // 全体 → ズームのみ（向正面切替なし）
+            if (cameraMode === 'closeup' && broadcastMode && homeStretchMirrorEnabled) {
+                // 中継/ズーム(直線反転あり) → 中継/ズーム(向正面のみ)
+                cameraMode = 'closeup';
+                broadcastMode = true;
+                homeStretchMirrorEnabled = false;
+                setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム(向正面のみ)', 'bg-orange-600', 'hover:bg-orange-700');
+            } else if (cameraMode === 'closeup' && broadcastMode && !homeStretchMirrorEnabled) {
+                // 中継/ズーム(向正面のみ) → ズームのみ
                 cameraMode = 'closeup';
                 broadcastMode = false;
                 setCamBtnStyle('<span class="mr-1">🎥</span> 視点: ズーム', 'bg-blue-600', 'hover:bg-blue-700');
             } else {
-                // ズームのみ → 中継/ズーム（デフォルトに戻る）
+                // ズームのみ → 中継/ズーム(直線反転あり、デフォルトに戻る)
                 cameraMode = 'closeup';
                 broadcastMode = true;
+                homeStretchMirrorEnabled = true;
                 setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', 'bg-red-600', 'hover:bg-red-700');
             }
         });
@@ -1913,10 +1920,14 @@
                 let skipEarly = (total_dist === 1400 || total_dist === 2400) && leaderHorse.run_dist < 300;
                 if (bcD >= backStart && bcD < backEnd && !skipEarly) {
                     bcActive = true;
-                    // 切り替わり直前3秒はだんだん黒くフェードアウトする(いきなり視点が変わって
-                    // 驚かないように)。先頭馬の速度からコース区間を抜けるまでの残り時間を概算する。
+                    // 切り替わり直前1秒はだんだん黒くフェードアウトする(いきなり視点が変わって
+                    // 驚かないように)。ただし、抜けた先がそのまま最後の直線(反転視点)に
+                    // 繋がる場合はフェードせずそのまま繋げる。
                     const _now = Date.now();
-                    if (_lastBcD !== null && _lastBcDTime !== null) {
+                    const _willEnterHomeStretch = homeStretchMirrorEnabled && (total_dist - leaderHorse.run_dist) <= L;
+                    if (_willEnterHomeStretch) {
+                        bcFadeAlpha = 0;
+                    } else if (_lastBcD !== null && _lastBcDTime !== null) {
                         let deltaBcD = bcD - _lastBcD;
                         let deltaT = (_now - _lastBcDTime) / 1000;
                         if (deltaT > 0 && deltaBcD > 0) {
@@ -1943,7 +1954,7 @@
                 // 逆に見える。同じdrawBroadcast()をmirrorView=trueで呼び、位置計算の符号と
                 // 馬の向きだけを反転させる（トラック等の背景はそのまま流用）
                 let remainToGoal2 = total_dist - leaderHorse.run_dist;
-                if (remainToGoal2 <= L && remainToGoal2 > 0) {
+                if (homeStretchMirrorEnabled && remainToGoal2 <= L && remainToGoal2 > 0) {
                     bcActive = true;
                     _lastBcD = leaderHorse.run_dist; _lastBcDTime = Date.now();
                     ctx.restore();
@@ -3950,7 +3961,7 @@
             const visW1 = camFocusDist + (W - FOCUS_X) / PX;
             const firstPost = Math.floor(visW0 / POST_SPACING_M) * POST_SPACING_M;
             for (let wx = firstPost; wx <= visW1 + POST_SPACING_M; wx += POST_SPACING_M) {
-                const px = FOCUS_X + (wx - camFocusDist) * PX;
+                const px = FOCUS_X + (wx - camFocusDist) * PX * (mirrorView?-1:1);
                 const isRed = Math.round(wx / POST_SPACING_M) % 4 === 0;
                 ctx.fillStyle=isRed?'#ef4444':'#f8fafc';
                 ctx.fillRect(px-3.5,RAIL_NEAR_Y-30,7,32);   // 手前（内ラチ・大）
@@ -3964,19 +3975,26 @@
                 return Math.pow(Math.min(1,Math.max(0,(lane-1)/17)), 0.90);
             }
             function laneY(lane) {
-                const t = laneNorm(lane);
+                const t0 = laneNorm(lane);
+                // 最後の直線(反転視点)は反対側から見るため、内外の奥行きも反転する
+                // （通常：内ラチ=手前/外ラチ=奥 → 反転視点：内ラチ=奥/外ラチ=手前）
+                const t = mirrorView ? (1 - t0) : t0;
                 // 馬が大きいので配置帯を画面中〜下に集約しつつ、レーン間Y差を確保
                 // t=0(内ラチ)→手前(下)、t=1(外ラチ)→奥(上)。手前馬が下の柵に食い込まない高さに
                 return TRACK_NEAR - 30 - (TRACK_NEAR-TRACK_FAR)*(0.05 + t*0.72);
             }
             function laneScale(lane) {
-                const t = laneNorm(lane);
+                const t0 = laneNorm(lane);
+                const t = mirrorView ? (1 - t0) : t0;
                 // 中継画像級の大きさ（手前1.7/奥0.95）。馬が画面の半分以上を占める迫力に
                 return 1.7 - t*0.75;
             }
 
-            // 手前の馬を後に描くため、外レーン(奥)→内レーン(手前)の順でソート
-            const sortedHorses = [...horses].sort((a,b)=>b.lane-a.lane);
+            // 手前の馬を後に描くため、奥→手前の順でソート
+            // （通常視点：外レーン=奥→内レーン=手前／反転視点：内レーン=奥→外レーン=手前）
+            const sortedHorses = mirrorView
+                ? [...horses].sort((a,b)=>a.lane-b.lane)
+                : [...horses].sort((a,b)=>b.lane-a.lane);
             sortedHorses.forEach(horse => {
                 const sx = FOCUS_X + (horse._dispDist2 - camFocusDist)*PX*(mirrorView?-1:1);
                 if (sx < -160 || sx > W+160) return;
@@ -4062,7 +4080,7 @@
             // ゴール線
             const distToGoal = total_dist - leaderDist;
             if (distToGoal < 600 && distToGoal >= -20) {
-                const gsx = FOCUS_X + (total_dist - camFocusDist) * PX;
+                const gsx = FOCUS_X + (total_dist - camFocusDist) * PX * (mirrorView?-1:1);
                 if (gsx>=0 && gsx<=W) {
                     const gTop = laneY(18), gBot = laneY(1);
                     ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.setLineDash([]);
@@ -4082,7 +4100,7 @@
             ctx.beginPath(); ctx.moveTo(0,H-4); ctx.lineTo(W,H-4); ctx.stroke();
             // 手前の柱（大きく・ワールド20m間隔で流れる／奥の柱と半分ずらして視差を出す）
             for (let wx = firstPost; wx <= visW1 + POST_SPACING_M; wx += POST_SPACING_M) {
-                const px = FOCUS_X + (wx + POST_SPACING_M*0.5 - camFocusDist) * PX;
+                const px = FOCUS_X + (wx + POST_SPACING_M*0.5 - camFocusDist) * PX * (mirrorView?-1:1);
                 const isRed = Math.round(wx / POST_SPACING_M) % 4 === 0;
                 ctx.fillStyle = isRed ? '#dc2626' : '#ffffff';
                 ctx.fillRect(px-5, FRONT_TOP_Y, 10, H-FRONT_TOP_Y);
@@ -4092,6 +4110,37 @@
             }
 
             ctx.restore(); // 手持ちジッター解除（以降のUIオーバーレイは揺れない）
+
+            // 最後の直線(反転視点)では、通常視点の全幅バナーの代わりに
+            // 右側にコンパクトなスキル発動演出を表示する
+            if (mirrorView && skillCutinEnabled && activeSkillCutins.length > 0) {
+                activeSkillCutins.forEach((cutin, idx) => {
+                    const alpha = Math.min(1.0, cutin.time / 15.0);
+                    const bw = 150, bh = 40, bx = W - bw - 14, by = 14 + idx * (bh+8);
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    let typeColors = {
+                        'nige': 'rgba(220, 38, 38, 0.88)',
+                        'senko': 'rgba(234, 88, 12, 0.88)',
+                        'sashi': 'rgba(37, 99, 235, 0.88)',
+                        'oikomi': 'rgba(147, 51, 234, 0.88)'
+                    };
+                    ctx.fillStyle = typeColors[cutin.horse.type] || 'rgba(0,0,0,0.85)';
+                    ctx.beginPath();
+                    ctx.roundRect(bx, by, bw, bh, 6);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.font = 'italic bold 11px sans-serif';
+                    ctx.fillText(`⚡ ${cutin.horse.skillName}`, bx+bw/2, by+15);
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.fillStyle = '#fde047';
+                    ctx.fillText(cutin.horse.name, bx+bw/2, by+29);
+                    ctx.restore();
+                });
+            }
 
             // -- 6. TV風オーバーレイ --
             _drawBCOverlay(distToGoal);
