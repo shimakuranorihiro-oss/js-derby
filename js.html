@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.82</span>
+            <span class="text-sm font-bold text-gray-400">v2.83</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1921,7 +1921,8 @@
             // カメラ位置(cameraX/Y/Scale)は上の処理で毎フレーム更新済みなので、
             // 区間を抜けて通常視点に戻る際もカクツキなく即座に正しい位置で復帰する
             // ゴール後（1頭でも入線したら）は向正面に切り替えず、ゴールシーンを通常視点で見せる
-            if (broadcastMode && isRacing && !isCoolDown && photoStep === -1 && leaderHorse && finishedHorses.length === 0) {
+            // ※ゴール後も、全馬が停止するまでは視点を切り替えない（1頭目線でぶつ切りにしない）
+            if (broadcastMode && isRacing && !isCoolDown && photoStep === -1 && leaderHorse && finishedHorses.length < horses.length) {
                 let bcD = (((start_dist + leaderHorse.run_dist) % C) + C) % C;
                 let cornerArc = Math.PI * R;
                 // 直線部分の前後にコーナーの大部分(65%)を含めて中継時間を長くする
@@ -1933,7 +1934,8 @@
                 let remainNow = total_dist - leaderHorse.run_dist;
                 // 最後の直線(反転視点)は残り約350m(3〜4百メートル)だけに限定する
                 const HOME_STRETCH_DIST = 350;
-                const inHomeStretchZone = homeStretchMirrorEnabled && remainNow <= HOME_STRETCH_DIST && remainNow > 0;
+                // ゴールを過ぎて減速する間も反転視点のまま維持する（-150mまで許容）
+                const inHomeStretchZone = homeStretchMirrorEnabled && remainNow <= HOME_STRETCH_DIST && remainNow > -150;
 
                 // 向正面(通常/非反転)の表示区間：反転視点が有効なときは、最後の直線ゾーンに
                 // 入るまでそのまま向正面カメラを継続する(4コーナーで一瞬全体視点に戻らないように)。
@@ -2148,7 +2150,7 @@
             if (photoStep === -1) {
                 for (let d = 200; d < total_dist; d += 200) {
                     const markDist = goal_dist - d;
-                    const mPos = getTrackPos(markDist, -3);
+                    const mPos = getTrackPos(markDist, -0.6);
                     const mAngle = getTrackAngle(markDist, currentCourseId);
                     ctx.save();
                     ctx.translate(mPos.x, mPos.y);
@@ -2166,13 +2168,12 @@
                 }
             }
 
-            // ゴール板（全体視点では小さく表示。ゴールラインの内側にトラックに沿って設置）
+            // ゴール板（全体視点では小さく表示。ゴールラインの内側にトラックに沿って設置。
+            // 実際の看板は常に正立しているので、トラックの角度には合わせて回転させない）
             if (photoStep === -1) {
-                let gBoardPos = getTrackPos(goal_dist, -4.5);
-                let gBoardAngle = getTrackAngle(goal_dist, currentCourseId);
+                let gBoardPos = getTrackPos(goal_dist, -0.6);
                 ctx.save();
                 ctx.translate(gBoardPos.x, gBoardPos.y);
-                ctx.rotate(gBoardAngle);
                 _drawHorseshoeSign(0, 0, Math.max(4, 7.5*TRACK_SCALE), 'GOAL');
                 ctx.restore();
             }
