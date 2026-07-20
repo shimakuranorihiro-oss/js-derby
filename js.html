@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.78</span>
+            <span class="text-sm font-bold text-gray-400">v2.79</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1183,13 +1183,19 @@
         let _lastBcD = null, _lastBcDTime = null; // 向正面区間の残り時間を概算するための直前値
 
         // ボタンの色をまとめて切り替えるヘルパー（キャンバス外の通常ボタン用）
-        function setCamBtnStyle(label, bgClass, hoverClass) {
-            cameraToggleBtn.className = `${bgClass} ${hoverClass} text-white font-bold px-4 py-2 rounded-full text-sm border border-gray-500 transition-colors flex items-center shadow`;
+        // ※Tailwindのbg-*クラスに頼ると、環境によって一部の色(orange等)が読み込まれず
+        // 背景が透明/白のまま文字だけ白になって見えなくなることがあったため、
+        // 背景色は必ずインラインstyleで直接指定して確実に効かせる。
+        function setCamBtnStyle(label, bgColor, bgHoverColor) {
+            cameraToggleBtn.className = 'text-white font-bold px-4 py-2 rounded-full text-sm border border-gray-500 transition-colors flex items-center shadow';
+            cameraToggleBtn.style.backgroundColor = bgColor;
+            cameraToggleBtn.onmouseenter = () => { cameraToggleBtn.style.backgroundColor = bgHoverColor; };
+            cameraToggleBtn.onmouseleave = () => { cameraToggleBtn.style.backgroundColor = bgColor; };
             cameraToggleBtn.innerHTML = label;
         }
 
         // 初期ボタン表示（デフォルト=中継/ズーム、直線反転あり）
-        setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', 'bg-red-600', 'hover:bg-red-700');
+        setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', '#dc2626', '#b91c1c');
 
         // 視点は4段階でループ：
         // 1) 中継/ズーム（向正面＋最後の直線を反転視点で表示）
@@ -1202,23 +1208,23 @@
                 cameraMode = 'closeup';
                 broadcastMode = true;
                 homeStretchMirrorEnabled = false;
-                setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム(向正面のみ)', 'bg-orange-600', 'hover:bg-orange-700');
+                setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム(向正面のみ)', '#ea580c', '#c2410c');
             } else if (cameraMode === 'closeup' && broadcastMode && !homeStretchMirrorEnabled) {
                 // 中継/ズーム(向正面のみ) → ズームのみ
                 cameraMode = 'closeup';
                 broadcastMode = false;
-                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: ズーム', 'bg-blue-600', 'hover:bg-blue-700');
+                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: ズーム', '#2563eb', '#1d4ed8');
             } else if (cameraMode === 'closeup' && !broadcastMode) {
                 // ズームのみ → 全体
                 cameraMode = 'normal';
                 broadcastMode = false;
-                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: 全体', 'bg-gray-700', 'hover:bg-gray-800');
+                setCamBtnStyle('<span class="mr-1">🎥</span> 視点: 全体', '#374151', '#1f2937');
             } else {
                 // 全体 → 中継/ズーム(直線反転あり、デフォルトに戻る)
                 cameraMode = 'closeup';
                 broadcastMode = true;
                 homeStretchMirrorEnabled = true;
-                setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', 'bg-red-600', 'hover:bg-red-700');
+                setCamBtnStyle('<span class="mr-1">📺</span> 視点: 中継/ズーム', '#dc2626', '#b91c1c');
             }
         });
 
