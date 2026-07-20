@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.77</span>
+            <span class="text-sm font-bold text-gray-400">v2.78</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -4342,11 +4342,13 @@
                     lastX = mx;
                     const my = midY + (stackLvl-1) * 8;
                     const isLead = h.run_dist === leadD;
-                    // 枠色の丸マーカー
+                    // 枠色の丸マーカー（白枠(1枠)は白背景に白い輪郭だとほぼ見えなくなるため、
+                    // その場合だけ輪郭を濃い色にしてコントラストを確保する）
+                    const isWhiteWaku = h.wakuBg === '#ffffff';
                     const rad = isLead ? 8 : 7;
                     ctx.fillStyle = h.wakuBg || '#e5e7eb';
-                    ctx.strokeStyle = isLead ? '#fbbf24' : 'rgba(255,255,255,0.6)';
-                    ctx.lineWidth = isLead ? 2 : 1;
+                    ctx.strokeStyle = isLead ? '#fbbf24' : (isWhiteWaku ? 'rgba(30,30,30,0.8)' : 'rgba(255,255,255,0.6)');
+                    ctx.lineWidth = isLead ? 2 : (isWhiteWaku ? 1.5 : 1);
                     ctx.beginPath(); ctx.arc(mx, my, rad, 0, Math.PI*2); ctx.fill(); ctx.stroke();
                     // 馬番
                     ctx.fillStyle = h.wakuText || '#000';
@@ -4364,6 +4366,21 @@
             ctx.fillStyle='#fff'; ctx.font='bold 15px sans-serif'; ctx.fillText(COURSES[currentCourseId].name, 18, 28);
             ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif';
             ctx.fillText(`${total_dist}m  ${currentSurface==='dirt'?'ダート':'芝'}`, 120, 30);
+
+            // --- 左上（LIVEパネルの下）: ペース表示 ---
+            // 判定地点（短距離400m/長距離600m）を通過してペースが確定してから表示する
+            if (paceDecided) {
+                let paceText = 'ミドルペース', paceColor = '#fbbf24';
+                if (currentPace === 'high') { paceText = 'ハイペース'; paceColor = '#ef4444'; }
+                else if (currentPace === 'slow') { paceText = 'スローペース'; paceColor = '#60a5fa'; }
+                else if (currentPace === 'dainige') { paceText = '大逃げ'; paceColor = '#d946ef'; }
+                ctx.font = 'bold 13px sans-serif';
+                const pw = ctx.measureText(paceText).width + 20;
+                ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                ctx.beginPath(); ctx.roundRect(10, 70, pw, 24, 6); ctx.fill();
+                ctx.fillStyle = paceColor; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(paceText, 10+pw/2, 70+13);
+            }
 
             // --- 右上: 残距離 ---
             const rem = Math.max(0, Math.round(distToGoal));
