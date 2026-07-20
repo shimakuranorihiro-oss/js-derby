@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.80</span>
+            <span class="text-sm font-bold text-gray-400">v2.81</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1930,14 +1930,25 @@
                 let backEnd   = 2 * L + cornerArc + cornerBleed;   // 第3コーナー中盤まで
                 // 1400m・2400mはスタート地点が向正面付近のため、序盤300mは全体視点で見せる
                 let skipEarly = (total_dist === 1400 || total_dist === 2400) && leaderHorse.run_dist < 300;
-                if (bcD >= backStart && bcD < backEnd && !skipEarly) {
+                let remainNow = total_dist - leaderHorse.run_dist;
+                // 最後の直線(反転視点)は残り約350m(3〜4百メートル)だけに限定する
+                const HOME_STRETCH_DIST = 350;
+                const inHomeStretchZone = homeStretchMirrorEnabled && remainNow <= HOME_STRETCH_DIST && remainNow > 0;
+
+                // 向正面(通常/非反転)の表示区間：反転視点が有効なときは、最後の直線ゾーンに
+                // 入るまでそのまま向正面カメラを継続する(4コーナーで一瞬全体視点に戻らないように)。
+                // 反転視点が無効なときは、従来通りbackEndで抜ける。
+                const inBackstretchWindow = homeStretchMirrorEnabled
+                    ? (bcD >= backStart && !inHomeStretchZone && !skipEarly)
+                    : (bcD >= backStart && bcD < backEnd && !skipEarly);
+
+                if (inBackstretchWindow) {
                     bcActive = true;
                     // 切り替わり直前1秒はだんだん黒くフェードアウトする(いきなり視点が変わって
-                    // 驚かないように)。ただし、抜けた先がそのまま最後の直線(反転視点)に
-                    // 繋がる場合はフェードせずそのまま繋げる。
+                    // 驚かないように)。ただし、反転視点が有効で、抜けた先がそのまま最後の直線に
+                    // 繋がる場合は、実際には切り替わりが発生しない(継続する)のでフェードしない。
                     const _now = Date.now();
-                    const _willEnterHomeStretch = homeStretchMirrorEnabled && (total_dist - leaderHorse.run_dist) <= L;
-                    if (_willEnterHomeStretch) {
+                    if (homeStretchMirrorEnabled) {
                         bcFadeAlpha = 0;
                     } else if (_lastBcD !== null && _lastBcDTime !== null) {
                         let deltaBcD = bcD - _lastBcD;
@@ -1961,26 +1972,16 @@
                     }
                     return;
                 }
-                // === 最後の直線：向正面と反対側から見た「反転視点」に切替 ===
+                // === 最後の直線（残り約350m）：向正面と反対側から見た「反転視点」に切替 ===
                 // 実際の競馬中継も向正面と最後の直線ではカメラが反対側にあり、馬の進行方向が
                 // 逆に見える。同じdrawBroadcast()をmirrorView=trueで呼び、位置計算の符号と
                 // 馬の向きだけを反転させる（トラック等の背景はそのまま流用）
-                // ※以前は「残りL以内」で判定していたが、向正面の終了地点(backEnd)との間に
-                // 隙間ができ、一瞬全体表示に戻ってしまっていた。向正面を抜けたらそのまま
-                // ゴールまで継続して反転視点に入るようにし、切れ目をなくす。
-                let remainToGoal2 = total_dist - leaderHorse.run_dist;
-                if (homeStretchMirrorEnabled && (bcD >= backEnd || remainToGoal2 <= L) && remainToGoal2 > 0) {
+                if (inHomeStretchZone) {
                     bcActive = true;
+                    bcFadeAlpha = 0; // 向正面からそのまま継続するのでフェードしない
                     _lastBcD = leaderHorse.run_dist; _lastBcDTime = Date.now();
                     ctx.restore();
                     drawBroadcast(true);
-                    if (bcFadeAlpha > 0) {
-                        ctx.save();
-                        ctx.globalAlpha = bcFadeAlpha;
-                        ctx.fillStyle = '#000';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.restore();
-                    }
                     return;
                 }
             }
@@ -2145,7 +2146,7 @@
 
             // ゴール板（全体視点では小さく表示。ゴールラインの外側にトラックに沿って設置）
             if (photoStep === -1) {
-                let gBoardPos = getTrackPos(goal_dist, 20.5);
+                let gBoardPos = getTrackPos(goal_dist, -4.5);
                 let gBoardAngle = getTrackAngle(goal_dist, currentCourseId);
                 ctx.save();
                 ctx.translate(gBoardPos.x, gBoardPos.y);
