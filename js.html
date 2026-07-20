@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.79</span>
+            <span class="text-sm font-bold text-gray-400">v2.80</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1965,8 +1965,11 @@
                 // 実際の競馬中継も向正面と最後の直線ではカメラが反対側にあり、馬の進行方向が
                 // 逆に見える。同じdrawBroadcast()をmirrorView=trueで呼び、位置計算の符号と
                 // 馬の向きだけを反転させる（トラック等の背景はそのまま流用）
+                // ※以前は「残りL以内」で判定していたが、向正面の終了地点(backEnd)との間に
+                // 隙間ができ、一瞬全体表示に戻ってしまっていた。向正面を抜けたらそのまま
+                // ゴールまで継続して反転視点に入るようにし、切れ目をなくす。
                 let remainToGoal2 = total_dist - leaderHorse.run_dist;
-                if (homeStretchMirrorEnabled && remainToGoal2 <= L && remainToGoal2 > 0) {
+                if (homeStretchMirrorEnabled && (bcD >= backEnd || remainToGoal2 <= L) && remainToGoal2 > 0) {
                     bcActive = true;
                     _lastBcD = leaderHorse.run_dist; _lastBcDTime = Date.now();
                     ctx.restore();
@@ -2138,6 +2141,25 @@
                  ctx.strokeStyle = '#ffffff';
                  ctx.lineWidth = 0.6 * TRACK_SCALE;
                  ctx.stroke();
+            }
+
+            // ゴール板（全体視点では小さく表示。ゴールラインの外側にトラックに沿って設置）
+            if (photoStep === -1) {
+                let gBoardPos = getTrackPos(goal_dist, 20.5);
+                let gBoardAngle = getTrackAngle(goal_dist, currentCourseId);
+                ctx.save();
+                ctx.translate(gBoardPos.x, gBoardPos.y);
+                ctx.rotate(gBoardAngle);
+                const bw = 14 * TRACK_SCALE, bh = 7 * TRACK_SCALE;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath(); ctx.ellipse(0, 0, bw/2+0.7*TRACK_SCALE, bh/2+0.7*TRACK_SCALE, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#0f7a3d';
+                ctx.beginPath(); ctx.ellipse(0, 0, bw/2, bh/2, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `bold ${Math.max(6, 3.2*TRACK_SCALE)}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('GOAL', 0, 0);
+                ctx.restore();
             }
 
             // ゲート描画
@@ -4089,16 +4111,32 @@
                 }
             });
 
-            // ゴール線
+            // ゴール線（縦の柵の範囲全体にきちんと届くよう、上下に少し余裕を持たせる）
             const distToGoal = total_dist - leaderDist;
             if (distToGoal < 600 && distToGoal >= -20) {
                 const gsx = FOCUS_X + (total_dist - camFocusDist) * PX * (mirrorView?-1:1);
                 if (gsx>=0 && gsx<=W) {
-                    const gTop = laneY(18), gBot = laneY(1);
+                    const gTop = laneY(18) - 6, gBot = laneY(1) + 14;
                     ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.setLineDash([]);
-                    ctx.beginPath(); ctx.moveTo(gsx,gTop); ctx.lineTo(gsx,gBot+8); ctx.stroke();
-                    ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
-                    ctx.textBaseline='bottom'; ctx.fillText('GOAL',gsx,gTop-4);
+                    ctx.beginPath(); ctx.moveTo(gsx,gTop); ctx.lineTo(gsx,gBot); ctx.stroke();
+
+                    // ゴール板（実際の競馬場にある楕円形の看板イメージ）：ゴール線の上に設置
+                    const boardW = 92, boardH = 46, boardY = gTop - boardH - 14;
+                    ctx.save();
+                    // 支柱2本
+                    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.moveTo(gsx-28, boardY+boardH*0.55); ctx.lineTo(gsx-28, gTop); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(gsx+28, boardY+boardH*0.55); ctx.lineTo(gsx+28, gTop); ctx.stroke();
+                    // 楕円形の看板本体（緑地に白フチ）
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath(); ctx.ellipse(gsx, boardY+boardH/2, boardW/2+4, boardH/2+4, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#0f7a3d';
+                    ctx.beginPath(); ctx.ellipse(gsx, boardY+boardH/2, boardW/2, boardH/2, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 20px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('GOAL', gsx, boardY+boardH/2);
+                    ctx.restore();
                 }
             }
 
@@ -6205,6 +6243,11 @@
         }
 
         function showResult(winner, betHorseName, betAmount) {
+            // リザルト表示時は全体視点に戻す（中継/ズーム中でも見やすいように）
+            cameraMode = 'normal';
+            broadcastMode = false;
+            homeStretchMirrorEnabled = true; // 次のレース用にデフォルトへ戻す
+            setCamBtnStyle('<span class="mr-1">🎥</span> 視点: 全体', '#374151', '#1f2937');
             let baseCameraScale = 1.0 / TRACK_SCALE;
             cameraScale = baseCameraScale * (currentCourseId === 'sonoda' ? 2.2 : 1.3); 
             cameraX = canvas.width * 0.5 - (500 * TRACK_SCALE) * cameraScale;
