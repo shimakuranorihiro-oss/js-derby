@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.72</span>
+            <span class="text-sm font-bold text-gray-400">v2.73</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -4173,9 +4173,10 @@
                 ctx.globalAlpha = 1;
 
                 // 帽子を枠順の色でティントして上から重ね描き（キャッシュ済みなので毎フレームの合成コストなし）
-                // ※820m戦などフルゲートが密集する場面での処理落ち対策として、画面上で小さく
-                // ほぼ見えないサイズの馬(sc<0.4)は帽子の重ね描きを省略し、描画コストを抑える。
-                if (sc >= 0.4 && helmetMaskAllReady() && horse.wakuBg) {
+                // ※帽子の重ね描き自体を省略すると、色付け前のグレーの下地がそのまま見えてしまい、
+                // 黒い毛色などでは白っぽい部分として目立ってしまう。必ず描画し、小さい馬(sc<0.4)は
+                // クロスフェード用の2枚目だけを省略して描画コストを抑える。
+                if (helmetMaskAllReady() && horse.wakuBg) {
                     const helmetSheet = getTintedHelmetSheet(horse.coat, horse.wakuBg);
                     ctx.globalAlpha = 1 - easedFrac;
                     ctx.drawImage(
@@ -4183,7 +4184,7 @@
                         fc0*S_FW, fr0*S_FH, S_FW, S_FH,
                         dx, dy, drawW, drawH
                     );
-                    if (easedFrac > 0.02) {
+                    if (sc >= 0.4 && easedFrac > 0.02) {
                         ctx.globalAlpha = easedFrac;
                         ctx.drawImage(
                             helmetSheet,
