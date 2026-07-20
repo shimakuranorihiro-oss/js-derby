@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.83</span>
+            <span class="text-sm font-bold text-gray-400">v2.84</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2150,20 +2150,12 @@
             if (photoStep === -1) {
                 for (let d = 200; d < total_dist; d += 200) {
                     const markDist = goal_dist - d;
-                    const mPos = getTrackPos(markDist, -0.6);
+                    const mPos = getTrackPos(markDist, -3);
                     const mAngle = getTrackAngle(markDist, currentCourseId);
                     ctx.save();
                     ctx.translate(mPos.x, mPos.y);
                     ctx.rotate(mAngle);
-                    const poleH = 5 * TRACK_SCALE, poleW = 1.1 * TRACK_SCALE;
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(-poleW/2, -poleH, poleW, poleH);
-                    ctx.strokeStyle = '#333'; ctx.lineWidth = Math.max(0.3, 0.2*TRACK_SCALE);
-                    ctx.strokeRect(-poleW/2, -poleH, poleW, poleH);
-                    ctx.fillStyle = (d % 1000 === 0) ? '#dc2626' : '#1d4ed8';
-                    ctx.font = `bold ${Math.max(4, 2.6*TRACK_SCALE)}px sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.fillText(`${d/100}`, 0, -poleH - 1);
+                    _drawFurlongPole(5*TRACK_SCALE, 1.3*TRACK_SCALE, Math.max(2.2, 2.3*TRACK_SCALE), d/100);
                     ctx.restore();
                 }
             }
@@ -2171,7 +2163,7 @@
             // ゴール板（全体視点では小さく表示。ゴールラインの内側にトラックに沿って設置。
             // 実際の看板は常に正立しているので、トラックの角度には合わせて回転させない）
             if (photoStep === -1) {
-                let gBoardPos = getTrackPos(goal_dist, -0.6);
+                let gBoardPos = getTrackPos(goal_dist, -3);
                 ctx.save();
                 ctx.translate(gBoardPos.x, gBoardPos.y);
                 _drawHorseshoeSign(0, 0, Math.max(4, 7.5*TRACK_SCALE), 'GOAL');
@@ -4127,20 +4119,15 @@
                 }
             });
 
-            // ハロン棒（残り距離のポール）：ゴールから200mごとに手前ラチ沿いに表示
+            // ハロン棒（残り距離のポール）：ゴールから200mごとにコース内側(手前ラチの奥)に表示
             for (let d = 200; d < total_dist; d += 200) {
                 const markWorldDist = total_dist - d; // このマーカーのrun_dist換算位置
                 const mx = FOCUS_X + (markWorldDist - camFocusDist) * PX * (mirrorView?-1:1);
                 if (mx < -40 || mx > W+40) continue;
-                const poleTopY = laneY(1) + 6, poleBotY = laneY(1) + 30;
+                const poleGroundY = laneY(1) + 20;
                 ctx.save();
-                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.moveTo(mx, poleTopY); ctx.lineTo(mx, poleBotY); ctx.stroke();
-                ctx.fillStyle = (d % 1000 === 0) ? '#dc2626' : '#2563eb';
-                ctx.beginPath(); ctx.roundRect(mx-11, poleTopY-16, 22, 16, 3); ctx.fill();
-                ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(`${d/100}`, mx, poleTopY-8);
+                ctx.translate(mx, poleGroundY);
+                _drawFurlongPole(26, 6, 10, d/100);
                 ctx.restore();
             }
 
@@ -4367,6 +4354,27 @@
             }
         }
 
+
+        // ハロン棒を描画するヘルパー。原点(0,0)を地面（棒の下端）とし、上方向(-Y)に伸ばす。
+        // 実物のように赤白の縞模様の棒＋赤い丸プレートに白文字で数字を表示する。
+        function _drawFurlongPole(poleH, poleW, discR, number) {
+            const stripeN = 3; // 縞の段数
+            const stripeH = poleH / stripeN;
+            for (let i = 0; i < stripeN; i++) {
+                ctx.fillStyle = (i % 2 === 0) ? '#c0392b' : '#ffffff';
+                ctx.fillRect(-poleW/2, -poleH + i*stripeH, poleW, stripeH + 0.5);
+            }
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = Math.max(0.5, poleW*0.08);
+            ctx.strokeRect(-poleW/2, -poleH, poleW, poleH);
+            // 上部の赤い丸プレート
+            const discCy = -poleH - discR*0.75;
+            ctx.fillStyle = '#c0392b';
+            ctx.beginPath(); ctx.arc(0, discCy, discR, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(discR*1.15)}px sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(`${number}`, 0, discCy + discR*0.05);
+        }
 
         // 馬蹄形(horseshoe)のゴール板を描画する。SONODA RACE COURSEの実際の看板のように、
         // 太い円弧(下だけ開いた形)の緑地に白フチ、弧に沿って文字を配置する。
