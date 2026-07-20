@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.74</span>
+            <span class="text-sm font-bold text-gray-400">v2.75</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -1938,6 +1938,25 @@
                     }
                     return;
                 }
+                // === 最後の直線：向正面と反対側から見た「反転視点」に切替 ===
+                // 実際の競馬中継も向正面と最後の直線ではカメラが反対側にあり、馬の進行方向が
+                // 逆に見える。同じdrawBroadcast()をmirrorView=trueで呼び、位置計算の符号と
+                // 馬の向きだけを反転させる（トラック等の背景はそのまま流用）
+                let remainToGoal2 = total_dist - leaderHorse.run_dist;
+                if (remainToGoal2 <= L && remainToGoal2 > 0) {
+                    bcActive = true;
+                    _lastBcD = leaderHorse.run_dist; _lastBcDTime = Date.now();
+                    ctx.restore();
+                    drawBroadcast(true);
+                    if (bcFadeAlpha > 0) {
+                        ctx.save();
+                        ctx.globalAlpha = bcFadeAlpha;
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.restore();
+                    }
+                    return;
+                }
             }
             if (bcActive) {
                 // 向正面から通常視点に切り替わった直後：フェードインを開始
@@ -3785,7 +3804,7 @@
         // ==========================================
         // TV中継モード（競馬中継風パース視点描画）
         // ==========================================
-        function drawBroadcast() {
+        function drawBroadcast(mirrorView = false) {
             // ギャロップアニメーション用のフレームdtを1回だけ計算（全馬で共有）
             const _now = Date.now();
             _frameDt = (_lastFrameTick !== null) ? Math.min(0.1, (_now - _lastFrameTick) / 1000) : 0;
@@ -3845,7 +3864,9 @@
             // === カメラ固定方式：先頭を画面右寄りに保ち、後続馬が右から入って左へ通過していく ===
             // （中継カメラのように視点を空間に据え、馬群が画面内を流れる構図）
             const camFocusDist = leaderDispDist;
-            const FOCUS_X = W * 0.72;   // 先頭馬を画面右72%に固定（大きい馬でも見切れない）→ 後続は左へ流れる
+            // mirrorView=true のとき（最後の直線）は向正面と反対側から見た構図にする：
+            // 先頭を画面左寄りに固定し、後続は右側に位置する（進行方向の見え方も反転）
+            const FOCUS_X = mirrorView ? W * 0.28 : W * 0.72;
             // 以降 sx = FOCUS_X + (horse._dispDist2 - camFocusDist) * PX で配置（2段平滑化位置を使用）
 
             // 手持ちカメラ風の微振動（速度が出ているほど揺れが強くなる＝スピード感の演出）
@@ -3957,7 +3978,7 @@
             // 手前の馬を後に描くため、外レーン(奥)→内レーン(手前)の順でソート
             const sortedHorses = [...horses].sort((a,b)=>b.lane-a.lane);
             sortedHorses.forEach(horse => {
-                const sx = FOCUS_X + (horse._dispDist2 - camFocusDist)*PX;
+                const sx = FOCUS_X + (horse._dispDist2 - camFocusDist)*PX*(mirrorView?-1:1);
                 if (sx < -160 || sx > W+160) return;
                 const sy = laneY(horse.lane), sc = laneScale(horse.lane);
                 const v = horse.currentVelocity || 0;
@@ -3983,8 +4004,16 @@
                     }
                 }
 
-                // 馬本体
-                _drawBCHorse(horse, sx, sy, sc);
+                // 馬本体（最後の直線＝反対視点のときは左右反転して描画。sxを軸に反転するので
+                // 配置位置(sx)自体は変わらず、馬の向き・脚の位置関係だけが鏡写しになる）
+                if (mirrorView) {
+                    ctx.save();
+                    ctx.translate(sx, 0); ctx.scale(-1, 1); ctx.translate(-sx, 0);
+                    _drawBCHorse(horse, sx, sy, sc);
+                    ctx.restore();
+                } else {
+                    _drawBCHorse(horse, sx, sy, sc);
+                }
 
                 // 実況で今言及している馬にマーク（大きめの下向き黄色矢印）を表示
                 const _isSpotlight = (horse === spotlightHorse) && (Date.now() < spotlightUntil);
