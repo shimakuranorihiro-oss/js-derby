@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.84</span>
+            <span class="text-sm font-bold text-gray-400">v2.85</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2148,7 +2148,7 @@
 
             // ハロン棒（残り距離のポール）：ゴールから200mごとに内ラチ沿いに設置
             if (photoStep === -1) {
-                for (let d = 200; d < total_dist; d += 200) {
+                for (let d = 200; d <= Math.min(1000, total_dist-1); d += 200) {
                     const markDist = goal_dist - d;
                     const mPos = getTrackPos(markDist, -3);
                     const mAngle = getTrackAngle(markDist, currentCourseId);
@@ -2166,7 +2166,7 @@
                 let gBoardPos = getTrackPos(goal_dist, -3);
                 ctx.save();
                 ctx.translate(gBoardPos.x, gBoardPos.y);
-                _drawHorseshoeSign(0, 0, Math.max(4, 7.5*TRACK_SCALE), 'GOAL');
+                _drawHorseshoeSign(0, 0, Math.max(5, 9.5*TRACK_SCALE), 'GOAL');
                 ctx.restore();
             }
 
@@ -2577,7 +2577,7 @@
                 ctx.fillRect(0, canvas.height - cinemaBarHeight, canvas.width, cinemaBarHeight);
             }
 
-            if (skillCutinEnabled && activeSkillCutins.length > 0) {
+            if (photoStep === -1 && skillCutinEnabled && activeSkillCutins.length > 0) {
                 activeSkillCutins.forEach((cutin, idx) => {
                     let progress = cutin.time / cutin.maxTime; 
                     let alpha = Math.min(1.0, cutin.time / 15.0); 
@@ -4119,15 +4119,16 @@
                 }
             });
 
-            // ハロン棒（残り距離のポール）：ゴールから200mごとにコース内側(手前ラチの奥)に表示
-            for (let d = 200; d < total_dist; d += 200) {
+            // ハロン棒（残り距離のポール）：ゴールから200mごとに内ラチのすぐ内側に設置。
+            // 目立つよう一回り大きくする
+            for (let d = 200; d <= Math.min(1000, total_dist-1); d += 200) {
                 const markWorldDist = total_dist - d; // このマーカーのrun_dist換算位置
                 const mx = FOCUS_X + (markWorldDist - camFocusDist) * PX * (mirrorView?-1:1);
                 if (mx < -40 || mx > W+40) continue;
-                const poleGroundY = laneY(1) + 20;
+                const poleGroundY = laneY(1) + 10;
                 ctx.save();
                 ctx.translate(mx, poleGroundY);
-                _drawFurlongPole(26, 6, 10, d/100);
+                _drawFurlongPole(34, 8, 13, d/100);
                 ctx.restore();
             }
 
@@ -4140,13 +4141,14 @@
                     ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.setLineDash([]);
                     ctx.beginPath(); ctx.moveTo(gsx,gTop); ctx.lineTo(gsx,gBot); ctx.stroke();
 
-                    // ゴール板（画像の「SONODA RACE COURSE」看板のような馬蹄形）：ゴール線の上に設置
-                    const hsR = 34, boardY = gTop - hsR - 26;
+                    // ゴール板（画像の「SONODA RACE COURSE」看板のような馬蹄形）：
+                    // ハロン棒と同様、内ラチのすぐ内側に設置。目立つよう大きめに
+                    const hsR = 46, boardGroundY = laneY(1) + 12, boardY = boardGroundY - hsR*1.15;
                     ctx.save();
                     // 支柱2本
-                    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 4;
-                    ctx.beginPath(); ctx.moveTo(gsx-22, boardY+hsR*0.5); ctx.lineTo(gsx-22, gTop); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(gsx+22, boardY+hsR*0.5); ctx.lineTo(gsx+22, gTop); ctx.stroke();
+                    ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 5;
+                    ctx.beginPath(); ctx.moveTo(gsx-28, boardY+hsR*0.5); ctx.lineTo(gsx-28, boardGroundY); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(gsx+28, boardY+hsR*0.5); ctx.lineTo(gsx+28, boardGroundY); ctx.stroke();
                     _drawHorseshoeSign(gsx, boardY, hsR, 'GOAL');
                     ctx.restore();
                 }
@@ -4380,14 +4382,17 @@
         // 太い円弧(下だけ開いた形)の緑地に白フチ、弧に沿って文字を配置する。
         // ctx は呼び出し側で必要なtranslate/scale等を済ませておくこと。cx,cyは弧の中心座標。
         function _drawHorseshoeSign(cx, cy, r, text) {
-            const gapDeg = 48; // 下部の開き角度(片側)
+            const gapDeg = 46; // 下部の開き角度(片側)
             const startA = (90 + gapDeg) * Math.PI / 180;
             const endA = (90 - gapDeg) * Math.PI / 180 + Math.PI * 2;
-            const bandW = r * 0.62;
+            const bandW = r * 0.68; // 画像のように太めの帯にする
             ctx.save();
+            // 目立たせるための薄い影
+            ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
             // 白フチ（太め）
-            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = bandW + 6; ctx.lineCap = 'round';
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = bandW + 7; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.arc(cx, cy, r, startA, endA, false); ctx.stroke();
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
             // 緑の帯（本体）
             ctx.strokeStyle = '#0f7a3d'; ctx.lineWidth = bandW; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.arc(cx, cy, r, startA, endA, false); ctx.stroke();
@@ -4397,7 +4402,7 @@
             const textStartDeg = 270 - textArcDeg/2;
             const anglePerChar = chars.length > 1 ? textArcDeg / (chars.length - 1) : 0;
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.max(9, Math.round(r*0.34))}px sans-serif`;
+            ctx.font = `bold ${Math.max(9, Math.round(r*0.36))}px sans-serif`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             chars.forEach((ch, i) => {
                 const deg = textStartDeg + anglePerChar * i;
