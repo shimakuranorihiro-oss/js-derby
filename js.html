@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.88</span>
+            <span class="text-sm font-bold text-gray-400">v2.89</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -4154,15 +4154,16 @@
                     ctx.beginPath(); ctx.moveTo(gsx,gTop); ctx.lineTo(gsx,gBot); ctx.stroke();
 
                     // ゴール板：実写画像をそのまま使用。コース内側(画面上部、外ラチのさらに奥)に設置
-                    const boardBottomY = laneY(18) + 110; // 画像が上にはみ出さないよう余白を確保
+                    const boardBottomY = gTop - 4; // 柵(外ラチ)の上側＝空のエリアに設置
                     if (goalBoardImgReady) {
-                        const gbW = 100;
+                        const gbW = 78;
                         const gbH = gbW * (GOAL_BOARD_IMG.naturalHeight / GOAL_BOARD_IMG.naturalWidth);
                         ctx.save();
                         ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 5;
                         ctx.beginPath(); ctx.moveTo(gsx-18, boardBottomY-gbH*0.15); ctx.lineTo(gsx-18, boardBottomY); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(gsx+18, boardBottomY-gbH*0.15); ctx.lineTo(gsx+18, boardBottomY); ctx.stroke();
-                        ctx.drawImage(GOAL_BOARD_IMG, gsx-gbW/2, boardBottomY-gbH, gbW, gbH);
+                        const gbDrawY = Math.max(2, boardBottomY-gbH);
+                        ctx.drawImage(GOAL_BOARD_IMG, gsx-gbW/2, gbDrawY, gbW, gbH);
                         ctx.restore();
                     } else {
                         const hsR = 46, boardY = boardBottomY - hsR*1.15;
