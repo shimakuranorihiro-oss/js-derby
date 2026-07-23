@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.96</span>
+            <span class="text-sm font-bold text-gray-400">v2.97</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -4151,11 +4151,14 @@
                 ctx.restore();
             }
 
-            // ゴール線（縦の柵の範囲全体にきちんと届くよう、上下に少し余裕を持たせる）
+            // ゴール線・ゴール板：カメラが非常にズームしているため、正確な世界座標のままだと
+            // 1秒未満で画面を通過してしまい実質見えない。距離が近づいたら画面端にクランプして
+            // 留まらせ、実際にゴールへ着く頃に自然な位置へ滑り込むようにする
             const distToGoal = total_dist - leaderDist;
-            if (distToGoal < 600 && distToGoal >= -20) {
-                const gsx = FOCUS_X + (total_dist - camFocusDist) * PX * (mirrorView?-1:1);
-                if (gsx>=0 && gsx<=W) {
+            if (distToGoal < 260 && distToGoal >= -20) {
+                const gsxRaw = FOCUS_X + (total_dist - camFocusDist) * PX * (mirrorView?-1:1);
+                const gsx = Math.max(60, Math.min(W-60, gsxRaw));
+                {
                     // 反転視点(直線)ではlaneY(1)とlaneY(18)の上下関係が入れ替わるため、
                     // min/maxで常に「画面上側」「画面下側」を正しく取るようにする
                     const gTop = Math.min(laneY(1), laneY(18)) - 6, gBot = Math.max(laneY(1), laneY(18)) + 14;
