@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.91</span>
+            <span class="text-sm font-bold text-gray-400">v2.92</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -4363,6 +4363,25 @@
 
                 // 胴体上のゼッケンバッジは廃止（ギャロップで胴体位置が動くため固定/補間どちらでも浮いて見える問題があった）。
                 // 馬番・枠色は頭上の馬名ラベル側にまとめて表示する。
+
+                // ムチ（追い出し）演出：接戦中・スタミナ切れの馬は、騎手の腕あたりに
+                // 振り下ろすムチのアニメーションを重ねる（通常視点のisWhippingと同じ条件を流用）
+                const _isWhipping = isRacing && !horse.isGoal && (horse.isBattling || horse.currentStamina < 15);
+                if (_isWhipping && sc > 0.35) {
+                    const armX = dx + drawW * 0.60, armY = dy + drawH * 0.42;
+                    const whipAnim = Math.sin(Date.now() / 45 + horse.horseNum * 10);
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(30,30,30,0.85)';
+                    ctx.lineWidth = Math.max(1, 1.6*sc);
+                    ctx.lineCap = 'round';
+                    const sx1 = armX, sy1 = armY;
+                    const sx2 = armX + whipAnim*6*sc, sy2 = armY + 10*sc;
+                    ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(230,230,230,0.9)';
+                    ctx.lineWidth = Math.max(0.6, 0.8*sc);
+                    ctx.beginPath(); ctx.moveTo(sx2, sy2); ctx.lineTo(sx2 + whipAnim*8*sc, sy2 + 8*sc); ctx.stroke();
+                    ctx.restore();
+                }
                 ctx.restore();
             } else {
                 // 画像読込前のフォールバック（簡易シルエット）
