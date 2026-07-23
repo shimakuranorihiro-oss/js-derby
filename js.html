@@ -46,7 +46,7 @@
         <div class="flex justify-center items-center mb-4 space-x-4">
             <button id="tabBasic" style="display:none" class="px-6 py-2 rounded-full font-bold text-white bg-blue-600 shadow-md transition transform hover:scale-105">基本コース (東京風)</button>
             <button id="tabSonoda" class="px-6 py-2 rounded-full font-bold text-blue-600 bg-white hover:bg-gray-100 shadow-md border-2 border-blue-600 transition transform hover:scale-105">園田競馬場 (ダート)</button>
-            <span class="text-sm font-bold text-gray-400">v2.93</span>
+            <span class="text-sm font-bold text-gray-400">v2.94</span>
         </div>
 
         <!-- レース条件設定パネル -->
@@ -2938,9 +2938,12 @@
                         highSeverity = Math.max(0.70, 1.0 - (total_dist - 1400) * 0.0003);
                     }
                     // 余剰消費分（1.0を超える部分）だけを距離で割り引く
+                    // ※差し・追込はハイペースの恩恵を受けやすいはずなのに、直線で
+                    // 一様に脚が上がって見える(だれる)との指摘があったため、消耗を少し軽くし
+                    // 直線でしっかり脚を使える余力を残すようにする(0.14→0.06)
                     if (horse.type === 'nige')       paceStaminaMod = 1.0 + 0.54 * highSeverity;
                     else if (horse.type === 'senko') paceStaminaMod = 1.0 + 0.48 * highSeverity;
-                    else                              paceStaminaMod = 1.0 + 0.14 * highSeverity;
+                    else                              paceStaminaMod = 1.0 + 0.06 * highSeverity;
 
                     // ハイペースは前にいる馬ほど消耗が大きく、後ろにいる馬ほど楽になる。
                     // 先頭からの距離(distToLeader)に応じて消費係数を補正する。
@@ -3195,7 +3198,9 @@
 
                 let courseSpurtMod = currentCourseId === 'basic' ? 1.12 : 0.95;
                 
-                let spStNige = 1.20, spStSenko = 1.25, spStSashi = 1.35, spStOikomi = 1.45;
+                // 追い込みがきっちり決まる場面を増やすため、最後のスパートのスタミナ消費を
+                // 少しだけ軽くする(1.45→1.38)。ガス欠で失速しきる前にゴールできる余地を広げる
+                let spStNige = 1.20, spStSenko = 1.25, spStSashi = 1.35, spStOikomi = 1.38;
                 if (currentCourseId === 'basic') {
                     spStNige = 1.28;
                     spStSenko = 1.28;
@@ -4133,16 +4138,15 @@
                 }
             });
 
-            // ハロン棒（残り距離のポール）：ゴールから200mごとに、内馬場(柵の外側の空エリア)に設置。
-            // ゴール板と同じ基準(柵のすぐ上)を使う
-            const _polesGTop = laneY(18) - 6;
-            const _polesBaseY = _polesGTop - 12; // 柵(外ラチ)のすぐ上＝内馬場側
+            // ハロン棒（残り距離のポール）：ゴールから200mごとに、内ラチの手前(画面下)に設置。
+            // ※ゴール板は内ラチの向こう側(画面上)に設置するため、あえて別の基準を使う
+            const _polesBaseY = TRACK_NEAR - 15;
             for (let d = 200; d <= Math.min(1000, total_dist-1); d += 200) {
                 const markWorldDist = total_dist - d; // このマーカーのrun_dist換算位置
                 const mx = FOCUS_X + (markWorldDist - camFocusDist) * PX * (mirrorView?-1:1);
                 if (mx < -40 || mx > W+40) continue;
                 ctx.save();
-                ctx.translate(mx, Math.max(38, _polesBaseY));
+                ctx.translate(mx, _polesBaseY);
                 _drawFurlongPole(22, 6, 9, d/100);
                 ctx.restore();
             }
