@@ -532,7 +532,7 @@
     fundsEl.className = state.funds < 0 ? 'minus' : '';
 
     // 次走レース：条件戦は毎週開催、重賞は実際の園田の年間カレンダー通り
-    const nextRace = C.getAvailableRace(state.currentTurn + 1, h.currentClass);
+    const nextRace = C.getAvailableRace(state.currentTurn + 1, h.currentClass, h);
     const cls = C.RACE_CLASSES[h.currentClass] || C.RACE_CLASSES.C3;
 
     if (nextRace) {
@@ -611,7 +611,7 @@
       // レース週は、既存のレースエンジンを開いて実際に走らせる。
       // 結果は postMessage で受け取り、finishRace() で反映する。
       pendingRace = {
-        raceInfo: C.getAvailableRace(turnBefore + 1, state.horse.currentClass),
+        raceInfo: C.getAvailableRace(turnBefore + 1, state.horse.currentClass, state.horse),
         weekMsg: msg,
         cost: res.cost,
         conditionKey: res.conditionKey,
@@ -667,6 +667,7 @@
       raceCount: h.totalRaces + 1,
       realNames: (window.SONODA_REAL_NAMES || []),
       isGraded: !!(raceInfo && raceInfo.isGraded),
+      sexRestriction: raceInfo ? raceInfo.sexRestriction : null,
       trackCondition: currentTrackCondition,
     });
     const playerRH = C.ownedHorseToRaceHorse(h, {
@@ -688,6 +689,10 @@
     }));
 
     $('emTitle').textContent = raceInfo ? raceInfo.name : 'レース';
+    let restrictionTag = '';
+    if (raceInfo && raceInfo.sexRestriction === 'female') restrictionTag = '　<span style="color:#db2777;font-size:11px;">🎀牝馬限定</span>';
+    if (raceInfo && raceInfo.ageRestriction) restrictionTag = `　<span style="color:#9fd3c7;font-size:11px;">${raceInfo.ageRestriction}歳限定</span>`;
+    $('emTitle').innerHTML = (raceInfo ? raceInfo.name : 'レース') + restrictionTag;
     $('emRaceInfo').textContent =
       'ダート' + (raceInfo ? raceInfo.distance : 1400) + 'm・' + npc.length + '頭立て' +
       '　1着賞金 ¥' + (raceInfo ? raceInfo.prize1st : 0).toLocaleString();

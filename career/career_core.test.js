@@ -240,6 +240,32 @@ check('毛色が継承される', child.coat === parent.coat);
 check('親がA1だと仔馬の初期値が高くなる', C.toDisplayScale(child.speedBase, 'speedBase') > 15);
 
 // ------------------------------------------------------------
+section('10b. 牝馬限定戦・年齢限定戦');
+
+const joou = C.GRADED_RACES.find(r => r.name === '兵庫女王盃');
+check('兵庫女王盃は牝馬限定', joou && joou.sexRestriction === 'female');
+const kikka = C.GRADED_RACES.find(r => r.name === '姫路菊花賞');
+check('姫路菊花賞は3歳限定', kikka && kikka.ageRestriction === 3);
+
+const maleHorse = C.createOwnedHorse({ birthTurn: 0 }); maleHorse.sex = 'male'; maleHorse.currentClass = 'A1';
+const femaleHorse = C.createOwnedHorse({ birthTurn: 0 }); femaleHorse.sex = 'female'; femaleHorse.currentClass = 'A1';
+const joouWeek = joou.week;
+const raceForMale = C.getAvailableRace(joouWeek, 'A1', maleHorse);
+check('牡馬は牝馬限定戦に出走できない(条件戦にフォールバック)', raceForMale.isGraded === false);
+const raceForFemale = C.getAvailableRace(joouWeek, 'A1', femaleHorse);
+check('牝馬は牝馬限定戦に出走できる', raceForFemale.isGraded === true && raceForFemale.name === '兵庫女王盃');
+
+const age3Horse = C.createOwnedHorse({ birthTurn: 0 }); age3Horse.age = 3; age3Horse.currentClass = 'A1';
+const age4Horse = C.createOwnedHorse({ birthTurn: 0 }); age4Horse.age = 4; age4Horse.currentClass = 'A1';
+const kikkaWeek = kikka.week;
+check('3歳馬は3歳限定重賞に出走できる', C.getAvailableRace(kikkaWeek, 'A1', age3Horse).isGraded === true);
+check('4歳馬は3歳限定重賞に出走できない', C.getAvailableRace(kikkaWeek, 'A1', age4Horse).isGraded === false);
+check('horse省略時は制限チェックしない(後方互換)', C.getAvailableRace(joouWeek, 'A1').isGraded === true);
+
+const npcField = C.generateRaceField('A1', 8, { raceCount: 1, sexRestriction: 'female' });
+check('牝馬限定戦のNPCは全頭牝馬', npcField.every(h => h.sex === 'female'));
+
+// ------------------------------------------------------------
 section('12b. 血統表');
 
 const g1 = C.createOwnedHorse({ name:'初代', birthTurn:0 });

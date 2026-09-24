@@ -52,21 +52,23 @@ const CLASS_ORDER = ['C3','C2','C1','B2','B1','A2','A1'];
  * 園田競馬の実際の年間重賞カレンダー（2026年の開催日・距離に準拠）。
  * week は1年52週のうちの開催週（1月第1週=1週目として日付から換算）。
  * 姫路開催の重賞も、園田の近い距離に読み替えて同じカレンダーに載せている。
- * ※Phase1では牝馬限定などの条件は設けず、すべての馬が出走可能とする。
+ * sexRestriction: 'female' の場合は牝馬限定。ageRestriction: 数値の場合は
+ * その年齢の馬だけが出走できる（実際の「菊花賞」「優駿」等の3歳限定重賞、
+ * 「女王盃」「クイーン賞」等の牝馬限定重賞に準拠）。指定が無ければ制限なし。
  */
 const GRADED_RACES = [
   { week:  4, name: '新春賞',              distance: 1400, prize1st: 10000000 },
-  { week:  8, name: '兵庫女王盃',          distance: 1400, prize1st: 12000000 },
-  { week: 11, name: '姫路菊花賞',          distance: 1800, prize1st:  8000000 },
+  { week:  8, name: '兵庫女王盃',          distance: 1400, prize1st: 12000000, sexRestriction: 'female' },
+  { week: 11, name: '姫路菊花賞',          distance: 1800, prize1st:  8000000, ageRestriction: 3 },
   { week: 13, name: '菊水賞',              distance: 1700, prize1st: 12000000 },
-  { week: 15, name: '西日本クラシック',    distance: 1870, prize1st: 10000000 },
+  { week: 15, name: '西日本クラシック',    distance: 1870, prize1st: 10000000, ageRestriction: 3 },
   { week: 18, name: '兵庫大賞典',          distance: 1400, prize1st: 15000000 },
-  { week: 19, name: '兵庫優駿',            distance: 1870, prize1st: 15000000 },
+  { week: 19, name: '兵庫優駿',            distance: 1870, prize1st: 15000000, ageRestriction: 3 },
   { week: 19, name: '兵庫チャンピオンシップ', distance: 1400, prize1st: 50000000 },
-  { week: 20, name: 'のじぎく賞',          distance: 1700, prize1st: 10000000 },
+  { week: 20, name: 'のじぎく賞',          distance: 1700, prize1st: 10000000, sexRestriction: 'female' },
   { week: 23, name: '六甲盃',              distance: 1870, prize1st: 15000000 },
   { week: 25, name: '園田FCスプリント',    distance:  820, prize1st: 10000000 },
-  { week: 28, name: '兵庫サマークイーン賞',distance: 1700, prize1st: 10000000 },
+  { week: 28, name: '兵庫サマークイーン賞',distance: 1700, prize1st: 10000000, sexRestriction: 'female' },
   { week: 33, name: '摂津盃',              distance: 1700, prize1st: 10000000 },
   { week: 38, name: '楠賞',                distance: 1400, prize1st: 12000000 },
   { week: 43, name: '兵庫ゴールドトロフィー', distance: 1400, prize1st: 20000000 },
@@ -557,20 +559,29 @@ function getGradedRaceAt(turn) {
 /**
  * その週に出走できるレースを返す。
  * 条件戦（C3〜A1）は毎週開催。重賞は実際のカレンダー通りの週にのみ開催され、
- * A1・A2クラスの馬だけが出走できる。
+ * A1・A2クラスの馬だけが出走できる。重賞に牝馬限定・年齢限定が付いている場合、
+ * 出走馬(horse)がその条件を満たさなければ通常の条件戦にフォールバックする。
+ * @param {number} turn
+ * @param {string} horseClass
+ * @param {object} [horse] - OwnedHorse。省略時は条件チェックをスキップする
  * @returns {object} { classKey, label, fieldSize, prize1st, distance, isGraded, name }
  */
-function getAvailableRace(turn, horseClass) {
+function getAvailableRace(turn, horseClass, horse) {
   const cls = RACE_CLASSES[horseClass];
   if (!cls) return null;
 
-  // A2以上の馬は、重賞開催週なら重賞に出走できる
+  // A2以上の馬は、重賞開催週なら重賞に出走できる（牝馬限定・年齢限定は要適合）
   const graded = getGradedRaceAt(turn);
-  if (graded && cls.order >= RACE_CLASSES.A2.order) {
+  const eligible = !graded ? false
+    : (!graded.sexRestriction || !horse || horse.sex === graded.sexRestriction)
+      && (!graded.ageRestriction || !horse || horse.age === graded.ageRestriction);
+  if (graded && eligible && cls.order >= RACE_CLASSES.A2.order) {
     return {
       classKey: horseClass, label: '重賞', name: graded.name,
       fieldSize: 16, prize1st: graded.prize1st,
       distance: graded.distance, isGraded: true,
+      sexRestriction: graded.sexRestriction || null,
+      ageRestriction: graded.ageRestriction || null,
     };
   }
 
@@ -686,6 +697,8 @@ function createNpcHorse(classKey, opts = {}) {
   const s = classStrength(baseClass);
   const used = opts.used || new Set();
   const rnd = (a, b) => a + Math.random() * (b - a);
+  // 牝馬限定戦なら、NPCも全頭牝馬にする（実際のレースの見た目に合わせる）
+  const sex = opts.sexRestriction === 'female' ? 'female' : (Math.random() < 0.5 ? 'male' : 'female');
 
   // 格上の強敵は一段上、重賞馬はさらに上の能力を持つ
   const boost = opts.isGradedRunner ? 1.02 : (opts.isRival ? 1.035 : 1.0);
@@ -714,6 +727,7 @@ function createNpcHorse(classKey, opts = {}) {
     accelType: Math.random() < 0.5 ? 'smooth' : 'sharp',
     isRival: !!opts.isRival,
     isGradedRunner: !!opts.isGradedRunner,
+    sex,
   };
 }
 
@@ -750,6 +764,7 @@ function generateRaceField(classKey, count, opts = {}) {
       // 重賞の出走馬は最上位クラス相当の能力にし、さらに底上げする
       isGradedRunner: isGraded,
       trackCondition: opts.trackCondition || 'good',
+      sexRestriction: opts.sexRestriction || null,
     }));
   }
   return field.sort(() => Math.random() - 0.5);
