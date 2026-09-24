@@ -401,6 +401,28 @@ function breedOffspring(parent, birthTurn) {
   return child;
 }
 
+/**
+ * 現在の所有馬から遡って血統表（祖先の連なり）を組み立てる。
+ * 現在の育成モデルは「引退した1頭の親」から仔馬を作る形（父か母のどちらか
+ * 一方の系統のみ）のため、血統表も枝分かれしない一本のチェーンになる。
+ * @param {object} currentHorse - 表示対象の馬（省略時は末端から辿らない単体表示用）
+ * @param {object[]} retiredHorses - state.retiredHorses（引退して殿堂入りした馬の配列）
+ * @returns {object[]} 世代の新しい順（現在の馬が先頭）に並んだ祖先チェーン
+ */
+function buildPedigreeChain(currentHorse, retiredHorses) {
+  const byId = new Map((retiredHorses || []).map(h => [h.id, h]));
+  const chain = [];
+  let cursor = currentHorse;
+  const seen = new Set();
+  while (cursor && !seen.has(cursor.id)) {
+    chain.push(cursor);
+    seen.add(cursor.id);
+    const parentId = cursor.sireId || cursor.damId;
+    cursor = parentId ? byId.get(parentId) : null;
+  }
+  return chain;
+}
+
 function checkRetirement(owned, currentTurn) {
   if (owned.status !== 'active') return null;
   const weeksElapsed = currentTurn - owned.birthTurn;
@@ -910,7 +932,7 @@ const CareerMode = {
   // 週サイクル
   applyTraining, applyRest, advanceWeek, rollCondition, getConditionWeights,
   // 引退
-  checkRetirement, retireByChoice, breedOffspring, inheritRate,
+  checkRetirement, retireByChoice, breedOffspring, inheritRate, buildPedigreeChain,
   TRACK_CONDITIONS, TRACK_CONDITION_ORDER, rollTrackCondition, rollDayPotential,
   // レース連携
   ownedHorseToRaceHorse, bestAptitudeKey, resolveSkillName, assignWakuIndices,

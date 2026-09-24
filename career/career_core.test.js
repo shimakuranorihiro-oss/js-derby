@@ -240,6 +240,23 @@ check('毛色が継承される', child.coat === parent.coat);
 check('親がA1だと仔馬の初期値が高くなる', C.toDisplayScale(child.speedBase, 'speedBase') > 15);
 
 // ------------------------------------------------------------
+section('12b. 血統表');
+
+const g1 = C.createOwnedHorse({ name:'初代', birthTurn:0 });
+g1.currentClass = 'A1'; g1.status = 'retired';
+const g2 = C.breedOffspring(g1, 150);
+g2.name = '2代目'; g2.currentClass = 'B1'; g2.status = 'retired';
+const g3 = C.breedOffspring(g2, 300);
+g3.name = '3代目';
+
+const chain3 = C.buildPedigreeChain(g3, [g1, g2]);
+check('3世代分のチェーンが組める', chain3.length === 3);
+check('先頭は現在の馬', chain3[0].name === '3代目');
+check('末尾が最も古い世代', chain3[2].name === '初代');
+check('親情報が無くても単体で返る', C.buildPedigreeChain(g1, []).length === 1);
+check('関係ない引退馬は含まれない', C.buildPedigreeChain(g3, [g1, g2, C.createOwnedHorse({birthTurn:0})]).length === 3);
+
+// ------------------------------------------------------------
 section('13. セーブ／ロード');
 
 const st6 = C.createNewGameState('セーブテスト');
