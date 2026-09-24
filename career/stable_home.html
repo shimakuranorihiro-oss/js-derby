@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>厩舎ホーム - 兵庫アーバン競馬シミュレーター Ver10.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap');
+
+  :root {
+    --navy: #16324a; --navy-dark: #0d2033; --gold: #f0b429;
+    --red: #d0362c; --green: #3ba55c; --paper: #eef3f6;
+    --panel: #143247; --panel-line: #2a4d66;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:#06131e; color:var(--paper);
+    font-family:'Zen Kaku Gothic New',-apple-system,"Hiragino Sans",sans-serif; height:100%; }
+  .stage { display:flex; align-items:center; justify-content:center; padding:16px 10px;
+    min-height:100vh; overflow-x:hidden; }
+
+  /* スマホ等、幅900pxに収まらない画面では .cab 全体を縮小して表示する。
+     内部のグリッド・フォントサイズは変更せず、丸ごと縮小するので
+     既存の細かいピクセル指定を書き換えずに対応できる。
+     外側(.cab-scale-wrap)はレイアウト上のスペースを確保するだけの箱で、
+     内側(.cab)を transform:scale で見た目だけ縮小する（二重に縮まないよう分離）。 */
+  .cab-scale-wrap { overflow:hidden; }
+  .cab { transform-origin: top left; }
+
+  .cab { width:900px; height:600px; background:var(--navy-dark); border:2px solid #244159;
+    border-radius:4px; display:flex; flex-direction:column; overflow:hidden; font-size:13px;
+    box-shadow:0 10px 30px rgba(0,0,0,.6); position:relative; }
+
+  .topbar { display:flex; justify-content:space-between; align-items:center; background:var(--navy);
+    padding:5px 12px; border-bottom:1px solid var(--panel-line); font-size:11px; flex:0 0 auto; }
+  .topbar .turn-info b { color:var(--gold); font-size:13px; }
+
+  .main { display:grid; grid-template-columns:200px 1fr 200px; gap:8px; padding:8px; flex:1 1 auto; min-height:0; }
+
+  /* ============ スマホ幅(縦画面)向けレイアウト ============
+     900px固定の筐体を縮小するのではなく、幅600px未満では
+     1カラムの縦積みレイアウトに組み替える。 */
+  @media (max-width: 600px) {
+    .cab { width:100%; max-width:480px; height:auto; min-height:100vh;
+      border-radius:0; box-shadow:none; }
+    .main { display:flex; flex-direction:column; padding:6px; gap:6px; }
+    .left-col, .center-col, .right-col { width:100%; }
+    .stall { min-height:170px; }
+    .horse-sil { width:130px; height:107px; }
+    .half-row { flex-direction:row; }
+    .log-panel { max-height:140px; }
+    .apt-mini-grid { grid-template-columns:repeat(4,1fr); }
+  }
+
+  /* left */
+  .left-col { display:flex; flex-direction:column; gap:6px; min-height:0; }
+  .next-race-card { background:var(--panel); border:1px solid var(--panel-line); border-radius:6px; padding:6px 8px; flex:0 0 auto; }
+  .nr-top { display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#9db6c9; }
+  .nr-flag { background:var(--red); color:#fff; font-size:9px; padding:1px 5px; border-radius:3px; }
+  .nr-weeks { font-weight:700; color:var(--gold); font-size:11px; }
+  .nr-grade { display:flex; align-items:center; gap:5px; margin-top:4px; }
+  .nr-grade .gbadge { background:linear-gradient(180deg,#f0b429,#b5791a); color:#2a1a00; font-weight:900;
+    font-size:10px; padding:1px 6px; border-radius:4px; }
+  .nr-grade .name { font-weight:700; font-size:12px; }
+
+  .horse-card { background:var(--panel); border:1px solid var(--panel-line); border-radius:6px; padding:8px;
+    flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+  .sex-icon { display:flex; align-items:center; gap:5px; }
+  .sex-badge { width:16px; height:16px; border-radius:50%; background:#3b82f6; color:#fff;
+    font-size:9px; display:flex; align-items:center; justify-content:center; font-weight:900; }
+  .horse-card h3 { margin:4px 0 3px; font-size:14px; }
+  .stat-line { margin-bottom:5px; }
+  .stat-line .sl-label { display:flex; justify-content:space-between; font-size:10px; color:#c7d8e3; margin-bottom:2px; }
+  .stat-line .sl-label b { color:#fff; }
+  .sl-bar { height:6px; background:#0d2033; border-radius:3px; overflow:hidden; }
+  .sl-bar > i { display:block; height:100%; border-radius:3px; transition:width .4s; }
+  .bar-speed>i{background:#e0483a} .bar-stam>i{background:#3b82f6}
+  .bar-guts>i{background:#f0b429} .bar-temp>i{background:#a855f7}
+
+  .hc-row { display:flex; justify-content:space-between; font-size:10.5px; color:#c7d8e3;
+    border-top:1px dashed #2a4d66; padding:2.5px 0; }
+  .hc-row b { color:#fff; font-variant-numeric:tabular-nums; }
+
+  .apt-mini-title { font-size:9.5px; color:#9db6c9; margin:5px 0 3px; }
+  .apt-mini-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:3px; }
+  .apt-mini { background:#0d2033; border:1px solid var(--panel-line); border-radius:4px; text-align:center; padding:3px 1px; }
+  .apt-mini.best { border-color:var(--gold); background:#2e2410; }
+  .apt-mini .am-name { font-size:8px; color:#9db6c9; }
+  .apt-mini .am-rank { font-size:11.5px; font-weight:900; }
+  .r-S{color:#ffd166}.r-A{color:#ffb347}.r-B{color:#9fd3c7}.r-C{color:#9aa5b1}.r-D{color:#6b7684}
+
+  /* center */
+  .center-col { display:flex; flex-direction:column; gap:6px; min-height:0; }
+  .stall { position:relative; border-radius:6px; overflow:hidden; border:3px solid #6b4a2c;
+    background: linear-gradient(180deg,transparent 0%,transparent 60%,rgba(0,0,0,.25) 60%,rgba(0,0,0,.25) 100%),
+      repeating-linear-gradient(90deg,#8a6339 0 34px,#7a5730 34px 36px),
+      linear-gradient(180deg,#cfae7c 0%,#b08f5c 60%,#8a6339 100%);
+    flex:1 1 auto; min-height:0; display:flex; align-items:flex-end; justify-content:center; }
+  .stall .beam { position:absolute; top:0; left:0; right:0; height:10px; background:#4a3319; }
+  .stall .lamp { position:absolute; top:10px; left:50%; transform:translateX(-50%); width:80px; height:80px;
+    border-radius:50%; background:radial-gradient(circle,rgba(255,230,170,.5),transparent 70%); }
+  .stall .straw { position:absolute; left:0; right:0; bottom:0; height:22px;
+    background:repeating-linear-gradient(100deg,#d9b65c 0 8px,#c49f43 8px 16px); opacity:.85; }
+  .horse-sil { position:relative; z-index:2; width:180px; height:148px; margin-bottom:14px; }
+  .cond-tag { position:absolute; top:8px; left:8px; z-index:3; background:rgba(13,32,51,.8);
+    border-radius:5px; padding:3px 9px; font-size:10.5px; }
+  .fatigue-overlay { position:absolute; bottom:6px; left:10px; right:10px; z-index:3; }
+  .fatigue-overlay .fo-label { display:flex; justify-content:space-between; font-size:9.5px;
+    color:#fff; text-shadow:0 1px 2px #000; margin-bottom:2px; }
+  .fatigue-track { height:9px; border-radius:5px; background:rgba(0,0,0,.5); overflow:hidden; }
+  .fatigue-fill { height:100%; background:linear-gradient(90deg,#3ba55c,#f0b429 55%,#e0483a); transition:width .4s; }
+
+  .half-row { display:flex; gap:6px; flex:0 0 auto; }
+  .half-box { flex:1; background:var(--panel); border:1px solid var(--panel-line); border-radius:6px; padding:6px; }
+  .half-box .hb-title { font-size:9.5px; color:#9db6c9; margin-bottom:4px; display:flex; justify-content:space-between; }
+  .half-box .hb-title .cur { color:var(--gold); font-weight:700; }
+  .act-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; }
+  .act-btn { background:#0d2033; border:2px solid var(--panel-line); border-radius:5px;
+    padding:5px 2px; text-align:center; cursor:pointer; transition:all .12s; }
+  .act-btn:hover { border-color:#6a8faa; }
+  .act-btn.on { border-color:var(--gold); background:#2e2410; }
+  .act-btn .ab-ico { font-size:15px; }
+  .act-btn .ab-txt { font-size:8.5px; margin-top:1px; }
+  .act-btn.race-btn { grid-column:span 2; border-color:var(--red); background:#2a1512; }
+  .act-btn.race-btn.on { border-color:#ff6b5a; background:#3a1a16; }
+  .act-btn.race-btn.graded { border-color:var(--gold); background:#2e2410; }
+  .act-btn.race-btn.graded.on { border-color:#ffd166; background:#3d3116; }
+  .act-btn.disabled { opacity:.3; cursor:not-allowed; }
+
+  .go-btn { width:100%; padding:10px; border:none; border-radius:7px; font-size:14px; font-weight:900;
+    cursor:pointer; color:#fff; background:linear-gradient(180deg,#e0483a,var(--red));
+    box-shadow:0 3px 0 #7a1c15; flex:0 0 auto; letter-spacing:.03em; }
+  .go-btn:active { transform:translateY(2px); box-shadow:0 1px 0 #7a1c15; }
+  .go-btn:disabled { background:#4a5560; box-shadow:0 3px 0 #2a3138; cursor:not-allowed; }
+
+  /* right */
+  .right-col { display:flex; flex-direction:column; gap:6px; min-height:0; }
+  .program-card { background:var(--panel); border:1px solid var(--panel-line); border-radius:6px; padding:7px 8px; flex:0 0 auto; }
+  .pc-title { font-size:9.5px; color:#9db6c9; display:flex; justify-content:space-between; }
+  .pc-race { display:flex; align-items:center; gap:5px; margin-top:5px; }
+  .pc-grade { background:linear-gradient(180deg,#c7d8e3,#8ea3b3); color:#0d2033; font-weight:900;
+    font-size:9.5px; padding:1px 5px; border-radius:4px; }
+  .pc-name { font-weight:700; font-size:12px; }
+  .pc-detail { font-size:10px; color:#9db6c9; margin-top:4px; }
+
+  .log-panel { background:var(--panel); border:1px solid var(--panel-line); border-radius:6px;
+    padding:7px 8px; flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  .log-panel .lp-title { font-size:9.5px; color:#9db6c9; margin-bottom:5px; flex:0 0 auto; }
+  .log-list { flex:1 1 auto; overflow-y:auto; font-size:10px; line-height:1.6; }
+  .log-list .log-item { border-bottom:1px dotted #2a4d66; padding:3px 0; color:#c7d8e3; }
+  .log-list .log-item .lg { color:var(--gold); }
+  .log-list .log-item .lr { color:#7ee0a0; }
+
+  .other-menu { display:flex; flex-direction:column; gap:4px; flex:0 0 auto; }
+  .other-menu button { background:var(--panel); border:1px solid var(--panel-line); color:var(--paper);
+    padding:5px; border-radius:5px; font-size:10px; cursor:pointer; text-align:left; }
+  .other-menu button:hover { background:#173a52; }
+
+  .statusbar { display:flex; justify-content:space-between; align-items:center; background:var(--navy);
+    border-top:1px solid var(--panel-line); padding:6px 14px; font-size:11px; flex:0 0 auto; }
+  .statusbar .coins b { color:var(--gold); }
+  .statusbar .coins b.minus { color:#ff8a7a; }
+
+  /* modal */
+  .modal-bg { position:absolute; inset:0; background:rgba(6,19,30,.85); z-index:50;
+    display:flex; align-items:center; justify-content:center; }
+  .modal-bg.hidden { display:none; }
+  /* レース中は、育成メニュー側の縮小レイアウト(.cab)とは切り離し、
+     画面全体を使って表示する（スマホでも小さくならないように） */
+  #raceOverlay.modal-bg { position:fixed; inset:0; z-index:200; }
+  .modal { background:var(--panel); border:2px solid var(--gold); border-radius:10px;
+    padding:20px 24px; width:400px; text-align:center; }
+  .modal h2 { margin:0 0 12px; font-size:17px; color:var(--gold); }
+  .modal p { font-size:12px; line-height:1.7; color:#c7d8e3; }
+  .modal input { width:100%; padding:9px; border-radius:6px; border:1px solid var(--panel-line);
+    background:#0d2033; color:#fff; font-size:14px; margin:10px 0; text-align:center;
+    font-family:inherit; }
+  .modal button { padding:10px 24px; border:none; border-radius:7px; font-size:13px; font-weight:900;
+    cursor:pointer; color:#fff; background:linear-gradient(180deg,#e0483a,var(--red)); box-shadow:0 3px 0 #7a1c15; }
+  .result-stats { text-align:left; background:#0d2033; border-radius:6px; padding:12px; margin:12px 0; font-size:12px; }
+  .result-stats div { display:flex; justify-content:space-between; padding:3px 0; }
+  .result-stats b { color:var(--gold); }
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="cab-scale-wrap" id="cabScaleWrap">
+<div class="cab">
+
+  <div class="topbar">
+    <div class="turn-info"><b id="turnNum">0</b> 週目 <span style="opacity:.6">/ 150週</span>　<span id="ageInfo">2歳</span></div>
+    <div id="growthTypeLabel" style="color:#9db6c9"></div>
+  </div>
+
+  <div class="main">
+    <!-- LEFT -->
+    <div class="left-col">
+      <div class="next-race-card">
+        <div class="nr-top"><span class="nr-flag">次走予定</span><span class="nr-weeks" id="nextRaceWeeks">-</span></div>
+        <div class="nr-grade"><span class="gbadge" id="nextRaceClass">C</span><span class="name" id="nextRaceName">-</span></div>
+      </div>
+
+      <div class="horse-card">
+        <div class="sex-icon"><span class="sex-badge" id="sexBadge">牝</span><span style="font-size:10px;color:#9db6c9" id="genLabel">1代目</span></div>
+        <h3 id="horseName">-</h3>
+
+        <div class="stat-line"><div class="sl-label"><span>スピード</span><b id="spdVal">0</b></div>
+          <div class="sl-bar bar-speed"><i id="spdBar" style="width:0%"></i></div></div>
+        <div class="stat-line"><div class="sl-label"><span>スタミナ</span><b id="stamVal">0</b></div>
+          <div class="sl-bar bar-stam"><i id="stamBar" style="width:0%"></i></div></div>
+        <div class="stat-line"><div class="sl-label"><span>根性</span><b id="gutsVal">0</b></div>
+          <div class="sl-bar bar-guts"><i id="gutsBar" style="width:0%"></i></div></div>
+        <div class="stat-line"><div class="sl-label"><span>気性</span><b id="tempVal">0</b></div>
+          <div class="sl-bar bar-temp"><i id="tempBar" style="width:0%"></i></div></div>
+
+        <div class="hc-row"><span>戦績</span><b id="recordVal">0戦0勝</b></div>
+        <div class="hc-row"><span>獲得賞金</span><b id="prizeVal">¥0</b></div>
+        <div class="hc-row"><span>引退まで</span><b id="remainWeeks">150週</b></div>
+
+        <div class="apt-mini-title">脚質適性</div>
+        <div class="apt-mini-grid" id="aptGrid"></div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="center-col">
+      <div class="stall">
+        <div class="beam"></div><div class="lamp"></div><div class="straw"></div>
+        <div class="cond-tag">調子: <span id="condTag">普通</span></div>
+        <svg class="horse-sil" viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="150" cy="214" rx="98" ry="9" fill="rgba(0,0,0,.3)"/>
+          <!-- 後脚 -->
+          <path id="legBL" d="M78 132 L70 168 L66 206 L80 206 L86 170 L94 138 Z" fill="#5c3418"/>
+          <path id="legBR" d="M100 136 L96 170 L92 206 L106 206 L110 172 L116 140 Z" fill="#5c3418"/>
+          <!-- 前脚 -->
+          <path id="legFL" d="M186 136 L184 172 L180 206 L194 206 L198 172 L202 140 Z" fill="#5c3418"/>
+          <path id="legFR" d="M206 134 L206 170 L204 206 L218 206 L220 170 L222 138 Z" fill="#5c3418"/>
+          <!-- 胴体（ずんぐりしすぎないよう高さを抑える） -->
+          <path id="horseBody"
+            d="M72 118
+               Q66 96 82 84
+               Q98 72 124 72
+               L188 72
+               Q212 72 224 84
+               Q234 96 230 116
+               Q228 138 210 142
+               L104 144
+               Q78 142 72 118 Z"
+            fill="#7a4a24"/>
+          <!-- 首（胴体から自然につながる角度に） -->
+          <path id="horseNeck" d="M206 82 Q220 58 236 42 Q244 32 256 36 Q262 40 258 50 L246 88 Q236 100 220 98 Z" fill="#7a4a24"/>
+          <!-- 頭（面長に） -->
+          <path id="horseHead" d="M242 40 Q258 26 276 30 Q288 34 286 46 Q283 60 268 66 Q252 68 244 58 Z" fill="#6b3f1d"/>
+          <!-- 耳 -->
+          <path d="M252 32 L248 16 L259 28 Z" fill="#4a2c14"/>
+          <path d="M266 30 L266 15 L275 27 Z" fill="#4a2c14"/>
+          <!-- 目 -->
+          <circle cx="266" cy="44" r="3.2" fill="#140a02"/>
+          <!-- 鼻筋の陰影 -->
+          <path d="M276 52 Q284 50 286 46 Q283 60 268 66 Z" fill="#000" opacity=".18"/>
+          <!-- たてがみ -->
+          <path d="M214 76 Q230 52 250 34 Q244 52 236 72 Q228 86 218 90 Z" fill="#3a2210"/>
+          <!-- 尻尾 -->
+          <path d="M74 100 Q48 108 34 138 Q31 152 41 154 Q52 142 60 124 Q66 110 78 106 Z" fill="#3a2210"/>
+        </svg>
+        <div class="fatigue-overlay">
+          <div class="fo-label"><span>疲労</span><b id="fatigueVal">0</b></div>
+          <div class="fatigue-track"><div class="fatigue-fill" id="fatigueBar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="half-row">
+        <div class="half-box">
+          <div class="hb-title"><span>◀ 前半</span><span class="cur" id="curAM">-</span></div>
+          <div class="act-grid" data-slot="am">
+            <div class="act-btn" data-act="train_speed"><div class="ab-ico">⚡</div><div class="ab-txt">スピード</div></div>
+            <div class="act-btn" data-act="train_stamina"><div class="ab-ico">🫁</div><div class="ab-txt">スタミナ</div></div>
+            <div class="act-btn" data-act="train_guts"><div class="ab-ico">🔥</div><div class="ab-txt">根性</div></div>
+            <div class="act-btn" data-act="rest"><div class="ab-ico">🌿</div><div class="ab-txt">休養</div></div>
+          </div>
+        </div>
+        <div class="half-box">
+          <div class="hb-title"><span>▶ 後半</span><span class="cur" id="curPM">-</span></div>
+          <div class="act-grid" data-slot="pm">
+            <div class="act-btn" data-act="train_speed"><div class="ab-ico">⚡</div><div class="ab-txt">スピード</div></div>
+            <div class="act-btn" data-act="train_stamina"><div class="ab-ico">🫁</div><div class="ab-txt">スタミナ</div></div>
+            <div class="act-btn" data-act="train_guts"><div class="ab-ico">🔥</div><div class="ab-txt">根性</div></div>
+            <div class="act-btn" data-act="rest"><div class="ab-ico">🌿</div><div class="ab-txt">休養</div></div>
+            <div class="act-btn race-btn" data-act="race"><div class="ab-ico">🏁</div><div class="ab-txt">レース出走</div></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="go-btn" id="goBtn">この内容で週を進める ▶</button>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-col">
+      <div class="program-card">
+        <div class="pc-title"><span>レーシングプログラム</span><span id="progWeek">-</span></div>
+        <div class="pc-race"><span class="pc-grade" id="progClass">C</span><span class="pc-name" id="progName">-</span></div>
+        <div class="pc-detail" id="progDetail">-</div>
+        <div class="pc-detail" id="gradedInfo" style="border-top:1px dashed #2a4d66;margin-top:6px;padding-top:5px;"></div>
+      </div>
+
+      <div class="log-panel">
+        <div class="lp-title">週間ログ</div>
+        <div class="log-list" id="logList"></div>
+      </div>
+
+      <div class="other-menu">
+        <button id="btnRetire">🏇 引退させる</button>
+        <button id="btnReset">🔄 最初からやり直す</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div>スタホ厩舎</div>
+    <div class="coins">所持金 <b id="fundsVal">¥0</b></div>
+  </div>
+
+  <!-- 出馬表・馬券購入 -->
+  <div class="modal-bg hidden" id="entryModal">
+    <div class="modal" style="width:640px;max-height:88%;overflow:auto;text-align:left;">
+      <h2 id="emTitle" style="text-align:center;">出馬表</h2>
+      <div id="emRaceInfo" style="text-align:center;font-size:11.5px;color:#9db6c9;margin-bottom:4px;"></div>
+      <div id="emConditionRow" style="text-align:center;font-size:11.5px;margin-bottom:10px;"></div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+        <thead>
+          <tr style="color:#9db6c9;border-bottom:1px solid var(--panel-line);">
+            <th style="padding:4px 2px;width:34px;">枠</th>
+            <th style="padding:4px 2px;width:30px;">番</th>
+            <th style="padding:4px 6px;text-align:left;">馬名</th>
+            <th style="padding:4px 2px;width:46px;">脚質</th>
+            <th style="padding:4px 2px;width:52px;">単勝</th>
+            <th style="padding:4px 2px;width:52px;">複勝</th>
+          </tr>
+        </thead>
+        <tbody id="emTable"></tbody>
+      </table>
+
+      <div style="border-top:1px solid var(--panel-line);margin-top:12px;padding-top:10px;">
+        <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:6px;">作戦（脚質）を選ぶ</div>
+        <div id="strategyPicker" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--panel-line);margin-top:12px;padding-top:10px;">
+        <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:6px;">馬券を買う（任意）</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;">
+          <select id="betHorse" style="flex:1;min-width:150px;padding:6px;border-radius:5px;background:#0d2033;color:var(--paper);border:1px solid var(--panel-line);font-family:inherit;"></select>
+          <select id="betType" style="padding:6px;border-radius:5px;background:#0d2033;color:var(--paper);border:1px solid var(--panel-line);font-family:inherit;">
+            <option value="WIN">単勝</option>
+            <option value="PLACE">複勝</option>
+          </select>
+          <select id="betAmount" style="padding:6px;border-radius:5px;background:#0d2033;color:var(--paper);border:1px solid var(--panel-line);font-family:inherit;"></select>
+        </div>
+        <div id="betNote" style="font-size:11px;color:#9db6c9;margin-top:6px;min-height:16px;"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button id="emCancel" style="flex:1;background:#3a4550;box-shadow:0 3px 0 #222a31;">出走をやめる</button>
+        <button id="emStart" style="flex:2;">レースへ ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- race overlay -->
+  <!-- start modal -->
+  <div class="modal-bg" id="startModal">
+    <div class="modal">
+      <h2>🐎 新規育成をはじめる</h2>
+      <p>あなたの厩舎に、1頭の若駒がやってきました。<br>150週かけて、この馬を育て上げましょう。</p>
+      <input type="text" id="nameInput" placeholder="馬の名前を入力" maxlength="12">
+      <button id="startBtn">育成をはじめる</button>
+    </div>
+  </div>
+
+  <!-- race result modal -->
+  <div class="modal-bg hidden" id="raceResultModal">
+    <div class="modal">
+      <h2 id="rrTitle">レース結果</h2>
+      <div class="result-stats" id="rrStats"></div>
+      <button id="rrOkBtn">厩舎に戻る</button>
+    </div>
+  </div>
+
+  <!-- confirm modal -->
+  <div class="modal-bg hidden" id="confirmModal">
+    <div class="modal">
+      <h2 id="cfTitle">確認</h2>
+      <p id="cfMsg"></p>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button id="cfCancel" style="flex:1;background:#3a4550;box-shadow:0 3px 0 #222a31;">キャンセル</button>
+        <button id="cfOk" style="flex:1;">実行する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- retire modal -->
+  <div class="modal-bg hidden" id="retireModal">
+    <div class="modal">
+      <h2>🏆 現役引退</h2>
+      <p id="retireMsg"></p>
+      <div class="result-stats" id="retireStats"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="breedBtn" style="flex:1;background:linear-gradient(180deg,#4fc172,#3ba55c);box-shadow:0 3px 0 #1f6b34;">🐴 繁殖馬にする</button>
+        <button id="retireOkBtn" style="flex:1;background:#3a4550;box-shadow:0 3px 0 #222a31;">新しい馬で始める</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+</div>
+
+  <div class="modal-bg hidden" id="raceOverlay" style="background:#000;padding:0;">
+    <div style="width:100%;height:100%;display:flex;flex-direction:column;">
+      <div style="background:var(--navy);padding:6px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11px;flex:0 0 auto;">
+        <span id="raceOverlayTitle">レース</span>
+        <span id="raceSlowHint" style="display:none;color:var(--gold);font-size:10.5px;margin-right:10px;">
+          接戦で判定に時間がかかっています。急ぐ場合は →</span>
+        <button id="raceSkipBtn" style="padding:4px 12px;border:1px solid var(--panel-line);border-radius:5px;background:#0d2033;color:var(--paper);cursor:pointer;font-size:11px;">スキップ</button>
+      </div>
+      <iframe id="raceFrame" style="flex:1 1 auto;width:100%;border:none;background:#000;"></iframe>
+      <div id="raceFallbackMsg" style="display:none;flex:1 1 auto;background:var(--panel);color:var(--paper);overflow:auto;"></div>
+    </div>
+  </div>
+
+
+<script src="career_core.js"></script>
+<script>
+(function(){
+  const C = window.CareerMode;
+  let state = null;
+  let selection = { am: null, pm: null };
+
+  const $ = id => document.getElementById(id);
+
+  /** レースエンジン(既存のjs.html)の場所。
+   *  育成モードと同じ階層に置くか、リポジトリ構成に合わせて変更する。 */
+  const RACE_ENGINE_URL = 'js.html';
+
+  // 毛色 → 表示色
+  const COAT_HEX = {
+    bay:'#7a4a24', darkBay:'#4a2c16', blueBlack:'#2b2230', black:'#1f1c1a',
+    chestnut:'#96562a', liverChestnut:'#5c3418', gray:'#8f8f92', white:'#d9d4cb'
+  };
+
+  function aptRank(v) {
+    if (v >= 85) return 'S'; if (v >= 70) return 'A';
+    if (v >= 55) return 'B'; if (v >= 40) return 'C'; return 'D';
+  }
+
+  /** 16進カラーを明るく/暗くする。amount: -1〜1 */
+  function shade(hex, amount) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const f = v => Math.max(0, Math.min(255, Math.round(v + 255 * amount)));
+    return '#' + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2,'0')).join('');
+  }
+
+  function render() {
+    if (!state) return;
+    const h = state.horse;
+
+    // ※state.currentTurn は世代をまたいでも増え続ける「暦」なので、
+    //   そのまま表示すると2代目以降が「151週目」から始まったように見えてしまう。
+    //   この馬が生まれてからの経過週数を表示する。
+    $('turnNum').textContent = state.currentTurn - h.birthTurn;
+    $('ageInfo').textContent = h.age + '歳';
+    $('growthTypeLabel').textContent =
+      '成長型: ' + ({early:'早熟', normal:'普通', late:'晩成'}[h.growthType] || '');
+
+    $('horseName').textContent = h.name;
+    $('sexBadge').textContent = h.sex === 'male' ? '牡' : '牝';
+    $('sexBadge').style.background = h.sex === 'male' ? '#3b82f6' : '#d05a8c';
+    $('genLabel').textContent = h.generation + '代目';
+
+    const spd = C.toDisplayScale(h.speedBase, 'speedBase');
+    const stam = C.toDisplayScale(h.maxStamina, 'maxStamina');
+    const guts = Math.round(h.guts * 10) / 10;
+    const temp = Math.round(h.temperament * 10) / 10;
+    $('spdVal').textContent = spd.toFixed(1);  $('spdBar').style.width = spd + '%';
+    $('stamVal').textContent = stam.toFixed(1); $('stamBar').style.width = stam + '%';
+    $('gutsVal').textContent = guts.toFixed(1); $('gutsBar').style.width = guts + '%';
+    $('tempVal').textContent = temp.toFixed(1); $('tempBar').style.width = temp + '%';
+
+    $('recordVal').textContent = h.totalRaces + '戦' + h.totalWins + '勝';
+    $('prizeVal').textContent = '¥' + h.totalPrize.toLocaleString();
+    const remain = Math.max(0, C.CAREER_TOTAL_WEEKS - (state.currentTurn - h.birthTurn));
+    $('remainWeeks').textContent = remain + '週';
+
+    // 脚質適性
+    const aptNames = { nige:'逃げ', senko:'先行', sashi:'差し', oikomi:'追込' };
+    const best = C.bestAptitudeKey(h);
+    $('aptGrid').innerHTML = Object.entries(h.aptitude).map(([k,v]) => {
+      const r = aptRank(v);
+      return `<div class="apt-mini ${k===best?'best':''}">
+        <div class="am-name">${aptNames[k]}</div>
+        <div class="am-rank r-${r}">${r}</div></div>`;
+    }).join('');
+
+    // コンディション・疲労
+    $('condTag').textContent = h.conditionKey;
+    $('fatigueVal').textContent = Math.round(h.fatigue);
+    $('fatigueBar').style.width = h.fatigue + '%';
+
+    // 馬体の色（毛色を各パーツに反映。脚と頭はやや暗くして陰影を出す）
+    const coatHex = COAT_HEX[h.coat] || '#7a4a24';
+    ['horseBody','horseNeck'].forEach(id => {
+      const el = $(id); if (el) el.setAttribute('fill', coatHex);
+    });
+    const darker = shade(coatHex, -0.18);
+    ['horseHead','legBL','legBR','legFL','legFR'].forEach(id => {
+      const el = $(id); if (el) el.setAttribute('fill', darker);
+    });
+
+    // 資金
+    const fundsEl = $('fundsVal');
+    fundsEl.textContent = '¥' + state.funds.toLocaleString();
+    fundsEl.className = state.funds < 0 ? 'minus' : '';
+
+    // 次走レース：条件戦は毎週開催、重賞は実際の園田の年間カレンダー通り
+    const nextRace = C.getAvailableRace(state.currentTurn + 1, h.currentClass);
+    const cls = C.RACE_CLASSES[h.currentClass] || C.RACE_CLASSES.C3;
+
+    if (nextRace) {
+      $('nextRaceWeeks').textContent = '来週';
+      $('nextRaceClass').textContent = nextRace.isGraded ? '重賞' : nextRace.label;
+      $('nextRaceName').textContent = nextRace.name;
+      $('progWeek').textContent = (state.currentTurn + 1) + '週';
+      $('progClass').textContent = nextRace.isGraded ? '重賞' : nextRace.label;
+      $('progName').textContent = nextRace.name;
+      $('progDetail').textContent = 'ダート' + nextRace.distance + 'm・' +
+        nextRace.fieldSize + '頭立て・1着賞金¥' + nextRace.prize1st.toLocaleString();
+    }
+
+    // 次の重賞の案内（A2未満の馬にも目標として見せる）
+    const ng = C.nextGradedRace(state.currentTurn);
+    if (ng) {
+      const canEnter = cls.order >= C.RACE_CLASSES.A2.order;
+      $('gradedInfo').innerHTML = ng.weeksAway === 1 && canEnter
+        ? `<span style="color:#ffd166">🏆 来週は${ng.race.name}！</span>`
+        : `次の重賞: <b>${ng.race.name}</b>（${ng.weeksAway}週後・${ng.race.distance}m）` +
+          (canEnter ? '' : '<br><span style="opacity:.6">※A2以上で出走可能</span>');
+    }
+
+    // レース出走可能か（条件戦は毎週あるので基本的に常に可能）
+    const raceBtn = document.querySelector('.act-btn.race-btn');
+    raceBtn.classList.remove('disabled');
+    raceBtn.querySelector('.ab-txt').textContent = nextRace && nextRace.isGraded
+      ? '重賞出走' : 'レース出走';
+    raceBtn.classList.toggle('graded', !!(nextRace && nextRace.isGraded));
+
+    // 選択状態の反映
+    ['am','pm'].forEach(slot => {
+      document.querySelectorAll(`.act-grid[data-slot="${slot}"] .act-btn`).forEach(b => {
+        b.classList.toggle('on', b.dataset.act === selection[slot]);
+      });
+      const labels = { train_speed:'スピード調教', train_stamina:'スタミナ調教',
+                       train_guts:'根性調教', rest:'休養', race:'レース出走' };
+      $(slot === 'am' ? 'curAM' : 'curPM').textContent = labels[selection[slot]] || '未選択';
+    });
+
+    $('goBtn').disabled = !(selection.am && selection.pm);
+  }
+
+  function addLog(html) {
+    const el = document.createElement('div');
+    el.className = 'log-item';
+    el.innerHTML = html;
+    $('logList').prepend(el);
+  }
+
+  // アクション選択
+  document.querySelectorAll('.act-grid').forEach(grid => {
+    grid.addEventListener('click', e => {
+      const btn = e.target.closest('.act-btn');
+      if (!btn || btn.classList.contains('disabled')) return;
+      selection[grid.dataset.slot] = btn.dataset.act;
+      render();
+    });
+  });
+
+  // 週を進める
+  $('goBtn').addEventListener('click', () => {
+    if (!state || !selection.am || !selection.pm) return;
+    const turnBefore = state.currentTurn;
+    const isRaceWeek = (selection.pm === 'race');
+
+    const res = C.advanceWeek(state, selection.am, selection.pm);
+
+    // 成長ログ
+    const gains = res.reports.filter(r => r.stat && r.gainDisplay > 0)
+      .map(r => `${r.stat} <span class="lg">+${r.gainDisplay.toFixed(1)}</span>`).join(' / ');
+    let msg = `<b>${turnBefore + 1}週目</b>：` + (gains || '休養');
+
+    // レース処理（簡易：ここでは着順を抽選。実装フェーズで既存エンジンに接続する）
+    if (isRaceWeek) {
+      // レース週は、既存のレースエンジンを開いて実際に走らせる。
+      // 結果は postMessage で受け取り、finishRace() で反映する。
+      pendingRace = {
+        raceInfo: C.getAvailableRace(turnBefore + 1, state.horse.currentClass),
+        weekMsg: msg,
+        cost: res.cost,
+        conditionKey: res.conditionKey,
+        retired: res.retired,
+      };
+      selection = { am: null, pm: null };
+      C.saveGame(state);
+      render();
+      showEntryList(pendingRace.raceInfo);   // 出馬表→馬券→レース の流れにする
+      return;
+    }
+
+    msg += `<br><span style="opacity:.6">維持費 -¥${res.cost.toLocaleString()} / 調子:${res.conditionKey}</span>`;
+    addLog(msg);
+
+    selection = { am: null, pm: null };
+    C.saveGame(state);
+    render();
+
+    if (res.retired) showRetireModal('現役期間の150週を走り抜きました。');
+  });
+
+  // ============ レースシーンへの遷移 ============
+  let pendingRace = null;
+
+  /** 所有馬の情報をURLパラメータに載せてレース画面を開く。
+   *  まずiframeで表示し、うまく表示できない環境（ローカルファイルの
+   *  セキュリティ制限など）では別ウィンドウで開くように切り替える。 */
+
+  // ============ 出馬表・馬券 ============
+  let currentField = null;    // オッズ付きの出走馬一覧
+  let currentBet = null;      // 購入した馬券
+
+  /** 出馬表を作って表示する */
+  let selectedStrategy = null;   // プレイヤーが選んだ脚質（未選択なら適性最高を自動選択）
+  let currentRaceInfo = null;
+  let currentTrackCondition = 'good';   // このレースの馬場状態
+  let currentDayPotential = null;       // 自厩舎馬のその日のポテンシャル
+
+  function showEntryList(raceInfo) {
+    const h = state.horse;
+    const size = raceInfo ? raceInfo.fieldSize : 12;
+    const cls = h.currentClass;
+    currentRaceInfo = raceInfo;
+    selectedStrategy = C.bestAptitudeKey(h);
+
+    // 馬場状態と、自厩舎馬のその日のポテンシャルを抽選する（レースごとに変わる）
+    currentTrackCondition = C.rollTrackCondition();
+    currentDayPotential = C.rollDayPotential();
+
+    // NPCを生成し、プレイヤー馬を混ぜて出走メンバーを確定する
+    const npc = C.generateRaceField(cls, size - 1, {
+      raceCount: h.totalRaces + 1,
+      realNames: (window.SONODA_REAL_NAMES || []),
+      isGraded: !!(raceInfo && raceInfo.isGraded),
+      trackCondition: currentTrackCondition,
+    });
+    const playerRH = C.ownedHorseToRaceHorse(h, {
+      strategy: selectedStrategy,
+      distance: raceInfo ? raceInfo.distance : 1400,
+      conditionStatMod: 1.0,
+      trackCondition: currentTrackCondition,
+      dayPotentialMod: currentDayPotential.mod,
+    });
+    playerRH.isPlayerHorse = true;
+    const insertAt = Math.floor(Math.random() * (npc.length + 1));
+    npc.splice(insertAt, 0, playerRH);
+
+    // 枠番・馬番を割り当て、オッズを計算する
+    const wakuIdx = C.assignWakuIndices(npc.length);
+    currentField = C.calcOdds(npc).map((horse, i) => Object.assign(horse, {
+      horseNum: i + 1,
+      wakuNum: wakuIdx[i] + 1,
+    }));
+
+    $('emTitle').textContent = raceInfo ? raceInfo.name : 'レース';
+    $('emRaceInfo').textContent =
+      'ダート' + (raceInfo ? raceInfo.distance : 1400) + 'm・' + npc.length + '頭立て' +
+      '　1着賞金 ¥' + (raceInfo ? raceInfo.prize1st : 0).toLocaleString();
+
+    const cond = C.TRACK_CONDITIONS[currentTrackCondition];
+    const condColor = { good:'#9fd3c7', yielding:'#f0b429', heavy:'#e0483a', poor:'#d0362c' }[currentTrackCondition];
+    const potColor = { great:'#ffd166', good:'#9fd3c7', normal:'#9db6c9', bad:'#f0b429', worst:'#e0483a' }[currentDayPotential.key];
+    $('emConditionRow').innerHTML =
+      `馬場：<b style="color:${condColor}">${cond.label}</b>` +
+      `　｜　自厩舎馬の調子：<b style="color:${potColor}">${currentDayPotential.label}</b>`;
+
+    renderEntryTable();
+
+    // 馬券の選択肢を用意
+    $('betHorse').innerHTML = '<option value="">馬券を買わない</option>' +
+      currentField.map(hh =>
+        `<option value="${hh.horseNum}">${hh.horseNum}. ${hh.name}${hh.isPlayerHorse?'（自厩舎）':''}</option>`
+      ).join('');
+    $('betAmount').innerHTML = C.BET_UNITS
+      .filter(a => a <= state.funds)
+      .map(a => `<option value="${a}">¥${a.toLocaleString()}</option>`).join('');
+    currentBet = null;
+    updateBetNote();
+    renderStrategyPicker();
+    $('entryModal').classList.remove('hidden');
+  }
+
+  /** 出馬表のテーブル行を描画する（作戦変更時の再描画にも使う） */
+  function renderEntryTable() {
+    const typeLabel = { nige:'逃げ', senko:'先行', sashi:'差し', oikomi:'追込' };
+    const WAKU_BG = ['#ffffff','#111111','#e11d48','#2563eb','#facc15','#16a34a','#f97316','#db2777'];
+    const WAKU_FG = ['#111','#fff','#fff','#fff','#111','#fff','#fff','#fff'];
+
+    $('emTable').innerHTML = currentField.map(hh => {
+      const wi = hh.wakuNum - 1;
+      const me = hh.isPlayerHorse;
+      const rival = hh.isRival;
+      return `<tr style="border-bottom:1px dotted #23394d;${me?'background:#2e2410;':''}">
+        <td style="padding:4px 2px;text-align:center;">
+          <span style="display:inline-block;width:20px;height:18px;line-height:18px;border-radius:3px;
+            background:${WAKU_BG[wi]};color:${WAKU_FG[wi]};font-weight:900;font-size:10px;">${hh.wakuNum}</span></td>
+        <td style="padding:4px 2px;text-align:center;font-weight:700;">${hh.horseNum}</td>
+        <td style="padding:4px 6px;">${hh.name}
+          ${me?'<span style="color:var(--gold);font-size:10px;font-weight:700;">（自厩舎）</span>':''}
+          ${rival?'<span style="color:#ff8a7a;font-size:10px;font-weight:700;">★強敵</span>':''}
+          ${hh.isGradedRunner?'<span style="color:#9fd3c7;font-size:10px;">名馬</span>':''}</td>
+        <td style="padding:4px 2px;text-align:center;color:#9db6c9;">${typeLabel[hh.type]||''}</td>
+        <td style="padding:4px 2px;text-align:center;font-variant-numeric:tabular-nums;">${hh.oddsWin.toFixed(1)}</td>
+        <td style="padding:4px 2px;text-align:center;color:#9db6c9;font-variant-numeric:tabular-nums;">${hh.oddsPlace.toFixed(1)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /** 脚質適性のランクを返す（apt-mini と同じ基準） */
+  function aptRankLabel(v) {
+    if (v >= 85) return 'S'; if (v >= 70) return 'A';
+    if (v >= 55) return 'B'; if (v >= 40) return 'C'; return 'D';
+  }
+
+  /** 作戦（脚質）ボタンを描画する */
+  function renderStrategyPicker() {
+    const h = state.horse;
+    const typeLabel = { nige:'逃げ', senko:'先行', sashi:'差し', oikomi:'追込' };
+    const typeIcon  = { nige:'🏃', senko:'🐎', sashi:'🎯', oikomi:'💨' };
+    const keys = ['nige','senko','sashi','oikomi'];
+    $('strategyPicker').innerHTML = keys.map(k => {
+      const rank = aptRankLabel(h.aptitude[k]);
+      const on = k === selectedStrategy;
+      return `<div class="opt strategy-opt ${on?'selected':''}" data-strategy="${k}"
+        style="padding:8px 4px;text-align:center;cursor:pointer;border-radius:8px;
+        border:2px solid ${on?'var(--gold)':'#2d3644'};background:${on?'#2a2210':'#161b22'};">
+        <div style="font-size:16px;">${typeIcon[k]}</div>
+        <div style="font-size:11px;font-weight:700;margin-top:2px;">${typeLabel[k]}</div>
+        <div style="font-size:13px;font-weight:900;margin-top:1px;color:${on?'var(--gold)':'#8b98a5'};">${rank}</div>
+      </div>`;
+    }).join('');
+    document.querySelectorAll('.strategy-opt').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedStrategy = el.dataset.strategy;
+        rebuildPlayerOdds();
+        renderStrategyPicker();
+      });
+    });
+  }
+
+  /** 選んだ脚質でプレイヤー馬の能力（実際にレースで使う値）だけを差し替える。
+   *  ※オッズは「馬の地力」を示すものとして、作戦を変えても変動させない
+   *    （作戦を変えるたびにオッズが動くと分かりづらいため、出馬表を開いた時点の
+   *    オッズのまま固定し、テーブルの再描画も行わない）
+   */
+  function rebuildPlayerOdds() {
+    if (!currentField) return;
+    const h = state.horse;
+    const idx = currentField.findIndex(f => f.isPlayerHorse);
+    if (idx < 0) return;
+    const old = currentField[idx];
+    const playerRH = C.ownedHorseToRaceHorse(h, {
+      strategy: selectedStrategy,
+      distance: currentRaceInfo ? currentRaceInfo.distance : 1400,
+      conditionStatMod: 1.0,
+      trackCondition: currentTrackCondition,
+      dayPotentialMod: currentDayPotential ? currentDayPotential.mod : 1.0,
+    });
+    playerRH.isPlayerHorse = true;
+    playerRH.horseNum = old.horseNum;
+    playerRH.wakuNum = old.wakuNum;
+    // 表示用のオッズだけは変更前の値を引き継ぐ（固定）
+    playerRH.oddsWin = old.oddsWin;
+    playerRH.oddsPlace = old.oddsPlace;
+    playerRH.winRate = old.winRate;
+    currentField[idx] = playerRH;
+    // オッズ・脚質列だけ更新（テーブル全体は再計算しない）
+    const cell = document.querySelector(`#emTable tr:nth-child(${idx+1}) td:nth-child(4)`);
+    const typeLabel = { nige:'逃げ', senko:'先行', sashi:'差し', oikomi:'追込' };
+    if (cell) cell.textContent = typeLabel[playerRH.type] || '';
+  }
+
+  /** 馬券の予想払戻を表示する */
+  function updateBetNote() {
+    const num = parseInt($('betHorse').value, 10);
+    if (!num || !currentField) { $('betNote').textContent = '馬券を買わずに出走することもできます'; return; }
+    const horse = currentField.find(h => h.horseNum === num);
+    const type = $('betType').value;
+    const amount = parseInt($('betAmount').value, 10) || 0;
+    const odds = type === 'WIN' ? horse.oddsWin : horse.oddsPlace;
+    $('betNote').innerHTML =
+      `${horse.name} の${type==='WIN'?'単勝':'複勝'} ${odds.toFixed(1)}倍　` +
+      `的中なら <b style="color:var(--gold)">¥${Math.floor(amount*odds).toLocaleString()}</b> の払戻`;
+  }
+  ['betHorse','betType','betAmount'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('change', updateBetNote);
+  });
+
+  // 出走をやめる（レース週の行動を取り消して厩舎に戻る）
+  $('emCancel').addEventListener('click', () => {
+    $('entryModal').classList.add('hidden');
+    if (!pendingRace) return;
+    // レースに出なかった分の記録だけ残して週を終える
+    addLog(pendingRace.weekMsg +
+      '<br><span style="opacity:.6">出走を取りやめました / 維持費 -¥' +
+      pendingRace.cost.toLocaleString() + '</span>');
+    pendingRace = null;
+    C.saveGame(state);
+    render();
+  });
+
+  // レースへ（馬券を確定してからレース画面に進む）
+  $('emStart').addEventListener('click', () => {
+    const num = parseInt($('betHorse').value, 10);
+    currentBet = null;
+    if (num && currentField) {
+      const horse = currentField.find(h => h.horseNum === num);
+      const type = $('betType').value;
+      const amount = parseInt($('betAmount').value, 10) || 0;
+      if (amount > 0 && amount <= state.funds) {
+        currentBet = {
+          type, amount,
+          horseNum: num,
+          horseName: horse.name,
+          odds: type === 'WIN' ? horse.oddsWin : horse.oddsPlace,
+        };
+        state.funds -= amount;   // 購入時に支払う
+      }
+    }
+    $('entryModal').classList.add('hidden');
+    render();
+    openRaceScreen(pendingRace ? pendingRace.raceInfo : null);
+  });
+
+  let raceWindow = null;
+  let raceFinishWatchdog = null;
+  let raceSlowHintTimer = null;
+  let raceWatchdog = null;
+  let raceReady = false;
+  let pendingStartPayload = null;   // RACE_READY受信後に送る出走メンバー一式
+
+  function openRaceScreen(raceInfo) {
+    const h = state.horse;
+    // 出馬表ですでに確定済みの自厩舎馬データ（選んだ作戦が反映済み）をそのまま使う
+    const fieldPlayer = currentField && currentField.find(f => f.isPlayerHorse);
+    const rh = fieldPlayer || C.ownedHorseToRaceHorse(h, {
+      strategy: selectedStrategy || C.bestAptitudeKey(h),
+      distance: raceInfo ? raceInfo.distance : 1400,
+      conditionStatMod: 1.0,
+    });
+    rh.isPlayerHorse = true;
+
+    const title = (raceInfo ? raceInfo.name : 'レース') +
+                  '（' + (raceInfo ? raceInfo.distance : 1400) + 'm）';
+    $('raceOverlayTitle').textContent = title;
+    $('raceFallbackMsg').style.display = 'none';
+    $('raceFrame').style.display = '';
+    $('raceSlowHint').style.display = 'none';
+
+    // 接戦(写真判定)などで結果表示が長引くことがあるため、一定時間経過したら
+    // 「スキップも使える」ことを案内し、ボタンを目立たせる
+    clearTimeout(raceSlowHintTimer);
+    raceSlowHintTimer = setTimeout(() => {
+      $('raceSlowHint').style.display = '';
+      $('raceSkipBtn').style.background = 'var(--gold)';
+      $('raceSkipBtn').style.color = '#2a1a00';
+      $('raceSkipBtn').style.fontWeight = '900';
+    }, 60000);
+
+    pendingStartPayload = {
+      type: 'CAREER_START',
+      field: currentField && currentField.length ? currentField : null,
+      playerHorse: rh,
+      fieldSize: raceInfo ? raceInfo.fieldSize : 12,
+      distance: raceInfo ? raceInfo.distance : 1400,
+    };
+
+    raceReady = false;
+    clearTimeout(raceWatchdog);
+    $('raceFrame').src = RACE_ENGINE_URL + '?career=1';
+    $('raceOverlay').classList.remove('hidden');
+
+    // 一定時間たっても準備完了の連絡が無ければ、この環境では表示できないと判断する
+    raceWatchdog = setTimeout(() => {
+      if (!raceReady) showRaceFallback();
+    }, 5000);
+  }
+
+  /** iframeで表示できない環境向け：別ウィンドウで開く導線を出す */
+  function showRaceFallback() {
+    $('raceFrame').style.display = 'none';
+    $('raceFallbackMsg').style.display = '';
+    $('raceFallbackMsg').innerHTML =
+      '<div style="text-align:center;padding:30px 20px;">' +
+      '<div style="font-size:15px;font-weight:700;margin-bottom:10px;">この環境ではレース画面をここに表示できません</div>' +
+      '<div style="font-size:12px;color:#9db6c9;line-height:1.8;margin-bottom:18px;">' +
+      'お使いのブラウザの制限により、育成画面の中にレースを埋め込めませんでした。<br>' +
+      '下のボタンから別ウィンドウでレースを開いてください。<br>' +
+      'レースが終わると自動でこの画面に結果が反映されます。</div>' +
+      '<button id="openRaceWinBtn" style="padding:12px 28px;border:none;border-radius:8px;' +
+      'background:linear-gradient(180deg,#e0483a,#d0362c);color:#fff;font-size:14px;' +
+      'font-weight:900;cursor:pointer;box-shadow:0 3px 0 #7a1c15;">別ウィンドウでレースを見る</button>' +
+      '<div style="font-size:11px;color:#7a8fa0;margin-top:14px;">' +
+      '※見なくてよければ、右上の「スキップ」で結果だけ受け取れます</div></div>';
+    const btn = document.getElementById('openRaceWinBtn');
+    if (btn) btn.addEventListener('click', () => {
+      raceWindow = window.open(RACE_ENGINE_URL + '?career=1', 'race_window', 'width=1050,height=700');
+      const trySend = setInterval(() => {
+        if (raceReady && pendingStartPayload) { clearInterval(trySend); return; }
+        if (raceWindow && raceWindow.closed) { clearInterval(trySend); return; }
+      }, 300);
+    });
+  }
+
+  /** レース画面を閉じて育成画面に戻す */
+  function closeRaceScreen() {
+    clearTimeout(raceWatchdog);
+    clearInterval(raceFinishWatchdog);
+    clearTimeout(raceSlowHintTimer);
+    $('raceSkipBtn').style.background = '#0d2033';
+    $('raceSkipBtn').style.color = 'var(--paper)';
+    $('raceSkipBtn').style.fontWeight = 'normal';
+    $('raceOverlay').classList.add('hidden');
+    $('raceFrame').src = 'about:blank';
+    if (raceWindow && !raceWindow.closed) { try { raceWindow.close(); } catch (e) {} }
+    raceWindow = null;
+  }
+
+  // レースエンジン（iframeまたは別窓）からの連絡を受け取る
+  window.addEventListener('message', (e) => {
+    const data = e.data;
+    if (!data) return;
+    if (data.type === 'RACE_READY') {
+      raceReady = true;
+      clearTimeout(raceWatchdog);
+      // 準備ができ次第、出走メンバー一式を送ってレースを開始してもらう
+      if (pendingStartPayload) {
+        const target = (raceWindow && !raceWindow.closed) ? raceWindow
+                      : $('raceFrame').contentWindow;
+        if (target) target.postMessage(pendingStartPayload, '*');
+      }
+      // 写真判定などの演出でエンジン側が止まり、結果が返ってこないことがあるため、
+      // レースが実質終わっている(isRacing=false)のに一定時間結果が来ない場合は
+      // 強制的に着順を取得して先に進める保険をかけておく
+      clearInterval(raceFinishWatchdog);
+      raceFinishWatchdog = setInterval(() => {
+        if (!pendingRace) { clearInterval(raceFinishWatchdog); return; }
+        const win = (raceWindow && !raceWindow.closed) ? raceWindow : $('raceFrame').contentWindow;
+        try {
+          const finished = win && !win.isRacing && typeof win.getCareerRaceOrder === 'function';
+          if (finished) {
+            const order = win.getCareerRaceOrder();
+            if (order && order.length > 0) {
+              clearInterval(raceFinishWatchdog);
+              const myNum = pendingStartPayload && pendingStartPayload.playerHorse
+                ? currentField.find(f => f.isPlayerHorse)?.horseNum : null;
+              const rank = myNum ? (order.indexOf(myNum) + 1 || order.length) : 1;
+              finishRace(rank, order.length);
+            }
+          }
+        } catch (e) { /* クロスオリジン等で読めない場合は何もしない（通常のpostMessage経路に任せる） */ }
+      }, 2000);
+      return;
+    }
+    if (data.type === 'RACE_FINISHED') {
+      finishRace(data.rank, data.fieldSize);
+    }
+  });
+
+  /** レース結果を受け取って反映する */
+  function finishRace(rank, fieldSize) {
+    if (!pendingRace) return;
+    const { raceInfo, weekMsg, cost, conditionKey, retired } = pendingRace;
+    pendingRace = null;
+    closeRaceScreen();
+
+    const r = C.applyRaceResult(state, state.horse, rank, state.horse.currentClass, {
+      raceName: raceInfo ? raceInfo.name : '',
+      distance: raceInfo ? raceInfo.distance : 1400,
+      prize1st: raceInfo ? raceInfo.prize1st : undefined,
+    });
+
+    let msg = weekMsg;
+
+    // 馬券の払戻を計算する
+    let betResult = null;
+    if (currentBet) {
+      // 買った馬の着順を調べる（自厩舎馬以外も対象）
+      let betHorseRank = null;
+      if (currentBet.horseNum === (currentField || []).find(h => h.isPlayerHorse)?.horseNum) {
+        betHorseRank = rank;
+      } else if (window.getCareerRaceOrder) {
+        const order = window.getCareerRaceOrder();
+        const pos = order.findIndex(n => n === currentBet.horseNum);
+        betHorseRank = pos >= 0 ? pos + 1 : null;
+      }
+      if (betHorseRank !== null) {
+        betResult = C.calcPayout(currentBet, betHorseRank);
+        if (betResult.hit) state.funds += betResult.payout;
+        betResult.rank = betHorseRank;
+      }
+    }
+
+    const mark = raceInfo && raceInfo.isGraded ? '🏆 ' : '🏁 ';
+    msg += `<br>${mark}${raceInfo ? raceInfo.name : ''} <span class="lr">${rank}着</span>` +
+           (r.prize > 0 ? ` 賞金¥${r.prize.toLocaleString()}` : '');
+    const promoted = C.tryPromote(state.horse);
+    if (promoted) msg += `<br>⬆️ <span class="lg">${promoted}クラスに昇級！</span>`;
+    if (currentBet) {
+      msg += betResult && betResult.hit
+        ? `<br>🎫 <span class="lg">馬券的中！ +¥${betResult.payout.toLocaleString()}</span>`
+        : `<br>🎫 <span style="opacity:.6">馬券は外れ（-¥${currentBet.amount.toLocaleString()}）</span>`;
+    }
+    msg += `<br><span style="opacity:.6">維持費 -¥${cost.toLocaleString()} / 調子:${conditionKey}</span>`;
+    addLog(msg);
+
+    // 結果モーダル
+    $('rrTitle').textContent = rank === 1 ? '🏆 優勝！' : `${rank}着`;
+    $('rrStats').innerHTML = `
+      <div><span>レース</span><b>${raceInfo ? raceInfo.name : '-'}</b></div>
+      <div><span>着順</span><b>${rank}着 / ${fieldSize}頭</b></div>
+      <div><span>獲得賞金</span><b>¥${r.prize.toLocaleString()}</b></div>
+      ${promoted ? `<div><span>昇級</span><b>${promoted}クラスへ！</b></div>` : ''}
+      ${currentBet ? `<div><span>馬券（${currentBet.horseName}）</span><b style="color:${betResult&&betResult.hit?'#7ee0a0':'#ff8a7a'}">${
+        betResult&&betResult.hit ? '的中 +¥'+betResult.payout.toLocaleString() : '不的中 -¥'+currentBet.amount.toLocaleString()
+      }</b></div>` : ''}
+      <div><span>通算</span><b>${state.horse.totalRaces}戦${state.horse.totalWins}勝</b></div>`;
+    currentBet = null;
+    $('raceResultModal').classList.remove('hidden');
+
+    C.saveGame(state);
+    render();
+    // 150週引退の場合も、いきなり切り替えず「厩舎に戻る」ボタンを押してから
+    // 引退画面に進むようにする（結果を見る前に画面が変わってしまうのを防ぐ）
+    pendingRetireAfterResult = retired ? '現役期間の150週を走り抜きました。' : null;
+  }
+
+  let pendingRetireAfterResult = null;
+
+  // レースエンジンから直接呼ばれる結果コールバック（同一ページ内なので postMessage 不要）
+
+  // スキップ：結果だけ抽選して厩舎に戻る
+  $('raceSkipBtn').addEventListener('click', () => {
+    if (!pendingRace) return;
+    const fs = pendingRace.raceInfo ? pendingRace.raceInfo.fieldSize : 12;
+    finishRace(1 + Math.floor(Math.random() * fs), fs);
+  });
+
+  $('rrOkBtn').addEventListener('click', () => {
+    $('raceResultModal').classList.add('hidden');
+    if (pendingRetireAfterResult) {
+      const reason = pendingRetireAfterResult;
+      pendingRetireAfterResult = null;
+      showRetireModal(reason);
+    }
+  });
+
+  function showRetireModal(reason) {
+    const h = state.horse;
+    $('retireMsg').textContent = `${h.name} が現役を引退しました。${reason}`;
+    $('retireStats').innerHTML = `
+      <div><span>世代</span><b>${h.generation}代目</b></div>
+      <div><span>通算成績</span><b>${h.totalRaces}戦${h.totalWins}勝</b></div>
+      <div><span>獲得賞金</span><b>¥${h.totalPrize.toLocaleString()}</b></div>
+      <div><span>最終スピード</span><b>${C.toDisplayScale(h.speedBase,'speedBase').toFixed(1)}</b></div>
+      <div><span>最終スタミナ</span><b>${C.toDisplayScale(h.maxStamina,'maxStamina').toFixed(1)}</b></div>
+      <div><span>最終根性</span><b>${(Math.round(h.guts*10)/10).toFixed(1)}</b></div>
+      <div><span>到達クラス</span><b>${C.RACE_CLASSES[h.currentClass].label}クラス</b></div>`;
+    $('retireModal').classList.remove('hidden');
+  }
+
+  /** 引退馬を繁殖に出し、仔馬でそのまま育成を続ける */
+  $('breedBtn').addEventListener('click', () => {
+    if (!state) return;
+    const parent = state.horse;
+    const child = C.breedOffspring(parent, state.currentTurn);
+    // 親は殿堂入りとして記録に残す（Phase1では簡易に配列へ積むだけ）
+    state.retiredHorses = state.retiredHorses || [];
+    state.retiredHorses.push(parent);
+    state.horse = child;
+    C.saveGame(state);
+
+    $('retireModal').classList.add('hidden');
+    $('logList').innerHTML = '';
+    addLog(`<b>🐴 世代交代</b>：${parent.name}（${parent.generation}代目）の血を引く` +
+      `${child.name}（${child.generation}代目）が誕生しました。` +
+      `<br><span style="opacity:.7">初期スピード ${C.toDisplayScale(child.speedBase,'speedBase').toFixed(1)}` +
+      `（親の実績が活かされ、通常より高い数値でスタート）</span>`);
+    render();
+  });
+
+  $('btnRetire').addEventListener('click', () => {
+    if (!state) return;
+    const weeks = state.currentTurn - state.horse.birthTurn;
+    if (weeks < C.WEEKS_PER_YEAR) {
+      askConfirm('まだ引退できません',
+        '3歳になるまで（52週経過するまで）は引退できません。現在 ' + weeks + '週目です。',
+        null);
+      return;
+    }
+    askConfirm('引退させる',
+      state.horse.name + ' を現役引退させます。よろしいですか？',
+      () => {
+        const r = C.retireByChoice(state.horse, state.currentTurn);
+        if (!r.ok) return;
+        C.saveGame(state);
+        showRetireModal('お疲れさまでした。');
+      });
+  });
+
+  /** セーブを消して、リロードに頼らずその場で初期状態に戻す
+   *  （ローカルのファイルを直接開いた場合、location.reload() が
+   *    効かない環境があるため、DOMを直接初期化する方式にしている） */
+  function resetToStart() {
+    try { localStorage.removeItem(C.SAVE_KEY); } catch (e) {}
+    state = null;
+    selection = { am: null, pm: null };
+    $('logList').innerHTML = '';
+    $('retireModal').classList.add('hidden');
+    $('nameInput').value = '';
+    $('startModal').classList.remove('hidden');
+    // 選択状態の表示をクリア
+    document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('on'));
+    $('curAM').textContent = '未選択';
+    $('curPM').textContent = '未選択';
+  }
+
+  $('retireOkBtn').addEventListener('click', resetToStart);
+
+  /** ブラウザのconfirm/alertは環境によってブロックされることがあるため、
+   *  画面内の確認モーダルを使う */
+  let confirmAction = null;
+  function askConfirm(title, message, onOk) {
+    $('cfTitle').textContent = title;
+    $('cfMsg').textContent = message;
+    confirmAction = onOk;
+    // 実行ボタンの要否をここで統一的に制御する（お知らせ用途なら隠す）
+    $('cfOk').style.display = onOk ? '' : 'none';
+    $('cfCancel').textContent = onOk ? 'キャンセル' : '閉じる';
+    $('confirmModal').classList.remove('hidden');
+  }
+  $('cfCancel').addEventListener('click', () => {
+    confirmAction = null;
+    $('confirmModal').classList.add('hidden');
+  });
+  $('cfOk').addEventListener('click', () => {
+    const fn = confirmAction;
+    confirmAction = null;
+    $('confirmModal').classList.add('hidden');
+    if (fn) fn();
+  });
+
+  $('btnReset').addEventListener('click', () => {
+    askConfirm('最初からやり直す',
+      'セーブデータを消して最初からやり直します。よろしいですか？',
+      resetToStart);
+  });
+
+  $('startBtn').addEventListener('click', () => {
+    const name = $('nameInput').value.trim() || 'アーバンスター';
+    state = C.createNewGameState(name);
+    C.saveGame(state);
+    $('startModal').classList.add('hidden');
+    addLog('<b>育成開始</b>：' + name + ' がやってきました');
+    render();
+  });
+
+  $('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('startBtn').click(); });
+
+  /** 旧バージョンのセーブデータを現行の形式に移行する。
+   *  クラス体系を C/B/A/GRADED から C3〜A1 の7段階に変更したため、
+   *  旧データをそのまま読むと存在しないクラスを参照して落ちてしまう。 */
+  function migrateSave(data) {
+    if (!data || !data.horse) return data;
+    const h = data.horse;
+    const legacyMap = { 'C':'C3', 'B':'B2', 'A':'A2', 'GRADED':'A1' };
+    if (!C.RACE_CLASSES[h.currentClass]) {
+      h.currentClass = legacyMap[h.currentClass] || 'C3';
+    }
+    // 想定外の値が入っていた場合の保険
+    if (typeof h.fatigue !== 'number' || isNaN(h.fatigue)) h.fatigue = 0;
+    if (!h.aptitude) h.aptitude = { nige:50, senko:50, sashi:50, oikomi:50 };
+    if (!Array.isArray(h.raceHistory)) h.raceHistory = [];
+    return data;
+  }
+
+  // 起動時：セーブデータがあれば復帰（旧形式なら移行してから）
+  const saved = migrateSave(C.loadGame());
+  if (saved && saved.horse && saved.horse.status === 'active') {
+    try {
+      state = saved;
+      $('startModal').classList.add('hidden');
+      addLog('<b>再開</b>：' + state.horse.name + ' の育成を再開しました');
+      render();
+      C.saveGame(state);   // 移行結果を保存し、次回以降は変換不要にする
+    } catch (e) {
+      // セーブデータが壊れている場合は、エラーで固まらせず新規開始に戻す
+      console.error('セーブデータの読み込みに失敗しました:', e);
+      try { localStorage.removeItem(C.SAVE_KEY); } catch (_) {}
+      state = null;
+      $('startModal').classList.remove('hidden');
+    }
+  }
+})();
+
+// ============================================================
+// レスポンシブ対応：幅900px(+余白)に収まらない画面(スマホ等)では
+// 筐体全体を縮小して表示する。内部レイアウトは変更しない。
+// ============================================================
+(function setupResponsiveScale() {
+  const CAB_W = 900, CAB_H = 600, MARGIN = 16;
+  function applyScale() {
+    const wrap = document.getElementById('cabScaleWrap');
+    const cab = wrap ? wrap.querySelector('.cab') : null;
+    if (!wrap || !cab) return;
+    // 600px未満はCSSメディアクエリ側で1カラムの縦画面レイアウトに
+    // 組み替わるため、JSによる縮小表示は行わずそのまま等倍で表示する
+    if (window.innerWidth < 600) {
+      cab.style.transform = 'none';
+      wrap.style.width = '100%';
+      wrap.style.height = 'auto';
+      return;
+    }
+    const availW = window.innerWidth - MARGIN * 2;
+    const availH = window.innerHeight - MARGIN * 2;
+    const scale = Math.min(1, availW / CAB_W, availH / CAB_H);
+    // 内側(.cab, 実寸900x600)だけを見た目上縮小する
+    cab.style.transform = `scale(${scale})`;
+    // 外側(ラッパー)は縮小後の実サイズをレイアウトの箱として確保する
+    // （二重に縮めないよう、ラッパー自体には transform をかけない）
+    wrap.style.width = (CAB_W * scale) + 'px';
+    wrap.style.height = (CAB_H * scale) + 'px';
+  }
+  window.addEventListener('resize', applyScale);
+  window.addEventListener('orientationchange', applyScale);
+  applyScale();
+})();
+</script>
+</body>
+</html>

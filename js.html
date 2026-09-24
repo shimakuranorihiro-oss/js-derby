@@ -25,6 +25,15 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .horse-option input[type="radio"]:checked + div { font-weight: bold; }
     </style>
+<style>
+/* 育成モードからiframeで開かれたときのレイアウト。
+   ヘッダーや設定パネルを隠し、レース画面だけを画面いっぱいに表示する。
+   （通常の観戦モードでは career-embed クラスが付かないため影響しない） */
+body.career-embed { background:#000 !important; margin:0 !important; padding:0 !important; }
+body.career-embed .career-hide { display:none !important; }
+body.career-embed > .container,
+body.career-embed > div { max-width:none !important; padding:4px !important; margin:0 !important; }
+</style>
 </head>
 <body class="p-2 md:p-6">
 
@@ -866,25 +875,41 @@
         let currentHorses = []; 
         let trifectaOddsList = [];
 
+        // 育成モード用：出走させるプレイヤー馬と出走頭数（未使用時はnull）
+        let careerPlayerHorse = null;
+        let careerFieldSize = null;
+        let careerModeActive = false;
+        let careerFixedField = null;   // 出馬表で確定済みの出走メンバー
+
         function prepareRaceData() {
             if (horsesPool.length === 0) setupHorsesPool();
 
             let shuffledPool = [...horsesPool].sort(() => Math.random() - 0.5);
-            let raceHorseCount = Math.min(18, shuffledPool.length);
+            let raceHorseCount = Math.min(careerFieldSize || 18, shuffledPool.length);
             currentHorses = shuffledPool.slice(0, raceHorseCount);
+
+            // 育成モード：出馬表で確定したメンバーがあれば、そのまま使う
+            if (careerFixedField && careerFixedField.length) {
+                currentHorses = careerFixedField.map(h => Object.assign({}, h));
+            } else if (careerPlayerHorse) {
+                currentHorses = currentHorses.slice(0, Math.max(0, raceHorseCount - 1));
+                const insertAt = Math.floor(Math.random() * (currentHorses.length + 1));
+                currentHorses.splice(insertAt, 0, careerPlayerHorse);
+            }
+
+            // 頭数に応じた枠割当（余りは外枠から1頭ずつ多く配分する実際の方式）
+            const n = currentHorses.length;
+            const wakuBase = Math.floor(n / 8), wakuRem = n % 8;
+            const wakuCounts = Array(8).fill(wakuBase);
+            for (let i = 0; i < wakuRem; i++) wakuCounts[7 - i] += 1;
+            const wakuIdxArr = [];
+            wakuCounts.forEach((cnt, wi) => { for (let i = 0; i < cnt; i++) wakuIdxArr.push(wi); });
 
             let totalWinRate = 0;
             currentHorses.forEach((horse, index) => {
                 horse.horseNum = index + 1; 
                 
-                let wakuIndex;
-                if (index < 12) {
-                    wakuIndex = Math.floor(index / 2);
-                } else if (index < 15) {
-                    wakuIndex = 6;
-                } else {
-                    wakuIndex = 7;
-                }
+                const wakuIndex = wakuIdxArr[index] !== undefined ? wakuIdxArr[index] : 7;
                 
                 horse.wakuBg = wakuColors[wakuIndex].bg;
                 horse.wakuText = wakuColors[wakuIndex].text;
@@ -2287,6 +2312,9 @@
                     }
                 }
 
+                // 育成モードでは、出馬表の時点で別計算のオッズをすでに見せているため、
+                // レース中にエンジン内部の(異なる計算式による)オッズ盤を重ねて出さない
+                if (!careerModeActive) {
                 ctx.fillStyle = '#111827'; 
                 ctx.fillRect(oddsBx, by, boardW, boardH);
                 ctx.strokeStyle = '#4b5563';
@@ -2372,6 +2400,7 @@
                         ctx.textAlign = 'left';
                     }
                 }
+                } // careerModeActive
                 
                 ctx.restore();
             }
@@ -2549,6 +2578,27 @@
                     ctx.lineTo(ax + shaftW, topY);
                     ctx.lineTo(ax + shaftW, topY + ah);
                     ctx.lineTo(ax + aw, topY + ah);
+                    ctx.closePath();
+                    ctx.fill(); ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 育成モード：自厩舎馬は常時赤、ライバル馬(強敵)は常時黄色のマークを付ける
+                if (horse.isPlayerHorse || horse.isRival) {
+                    ctx.save();
+                    ctx.fillStyle = horse.isPlayerHorse ? '#ef4444' : '#facc15';
+                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                    ctx.lineWidth = 1.2;
+                    const ax2 = pos.x, topY2 = markerY - 26;
+                    const aw2 = 4.5, ah2 = 5, shaftW2 = 2.25, shaftH2 = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(ax2, topY2 + ah2 + shaftH2);
+                    ctx.lineTo(ax2 - aw2, topY2 + ah2);
+                    ctx.lineTo(ax2 - shaftW2, topY2 + ah2);
+                    ctx.lineTo(ax2 - shaftW2, topY2);
+                    ctx.lineTo(ax2 + shaftW2, topY2);
+                    ctx.lineTo(ax2 + shaftW2, topY2 + ah2);
+                    ctx.lineTo(ax2 + aw2, topY2 + ah2);
                     ctx.closePath();
                     ctx.fill(); ctx.stroke();
                     ctx.restore();
@@ -3067,8 +3117,8 @@
                 // ==========================================
                 if (horse.currentStamina < 52) {
                     let t = Math.max(0, horse.currentStamina) / 52; // 1.0 (残52) -> 0.0 (残0)
-                    // バテたらしっかり減速する（下限を下げて消耗の影響を明確に）
-                    const midRaceFadeFloor = currentSurface === 'dirt' ? 0.76 : 0.82;
+                    // 直線の失速(fadeFloor)と重なって過度に遅くならないよう、こちらは軽めに留める
+                    const midRaceFadeFloor = currentSurface === 'dirt' ? 0.90 : 0.92;
                     let eased = t * t * 0.4 + t * 0.6;
                     let midRaceFade = midRaceFadeFloor + (1.0 - midRaceFadeFloor) * eased;
                     currentSpeed *= midRaceFade;
@@ -3284,8 +3334,10 @@
                     let staminaFade = 1.0;
 
                     // スタミナが「45」を切ると、0に向かってジワジワとスピードが低下する
-                    // 芝：下限0.70 / ダート：下限0.62（ダートは消耗戦＝バテるとより止まる）
-                    const fadeFloor = currentSurface === 'dirt' ? 0.54 : 0.62;
+                    // ※以前は下限0.54(ダート)/0.62(芝)と非常に厳しく、完全にバテると
+                    //   ほぼ半分の速度まで落ちていた。実際の競馬では最後の200mが12秒でも
+                    //   15秒でも1.25倍程度の差でしかないため、それに近い比率まで緩和する
+                    const fadeFloor = currentSurface === 'dirt' ? 0.80 : 0.84;
                     if (horse.currentStamina < 42) {
                         let t = horse.currentStamina / 42; // 1.0 (残42) -> 0.0 (残0)
                         // カーブを少し効かせ、残量が減るほど加速度的に垂れる
@@ -4114,6 +4166,27 @@
                     ctx.lineTo(ax + shaftW, topY);
                     ctx.lineTo(ax + shaftW, topY + ah);
                     ctx.lineTo(ax + aw, topY + ah);               // 右羽根
+                    ctx.closePath();
+                    ctx.fill(); ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 育成モード：自厩舎馬は常時赤、ライバル馬(強敵)は常時黄色のマークを付ける
+                if (horse.isPlayerHorse || horse.isRival) {
+                    ctx.save();
+                    ctx.fillStyle = horse.isPlayerHorse ? '#ef4444' : '#facc15';
+                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                    ctx.lineWidth = 1.2*sc;
+                    const ax2 = sx, topY2 = sy - 82*sc;
+                    const aw2 = 8*sc, ah2 = 10*sc, shaftW2 = 4*sc, shaftH2 = 7*sc;
+                    ctx.beginPath();
+                    ctx.moveTo(ax2, topY2 + ah2 + shaftH2);
+                    ctx.lineTo(ax2 - aw2, topY2 + ah2);
+                    ctx.lineTo(ax2 - shaftW2, topY2 + ah2);
+                    ctx.lineTo(ax2 - shaftW2, topY2);
+                    ctx.lineTo(ax2 + shaftW2, topY2);
+                    ctx.lineTo(ax2 + shaftW2, topY2 + ah2);
+                    ctx.lineTo(ax2 + aw2, topY2 + ah2);
                     ctx.closePath();
                     ctx.fill(); ctx.stroke();
                     ctx.restore();
@@ -6375,6 +6448,27 @@
         }
 
         function showResult(winner, betHorseName, betAmount) {
+            // 育成モードから iframe で呼ばれている場合、着順を親画面へ通知する。
+            // （通常の観戦モードでは親が居ないため何も起きない）
+            try {
+                // 親ウィンドウ（iframe）または開き元ウィンドウ（別窓）に結果を返す
+                const target = (window.parent && window.parent !== window) ? window.parent
+                             : (window.opener ? window.opener : null);
+                if (target) {
+                    const order = [...finishedHorses];
+                    const playerIdx = order.findIndex(h => h.isPlayerHorse);
+                    if (playerIdx >= 0) {
+                        target.postMessage({
+                            type: 'RACE_FINISHED',
+                            rank: playerIdx + 1,
+                            fieldSize: currentHorses.length,
+                            horseName: order[playerIdx].name,
+                            top3: order.slice(0, 3).map(h => h.name),
+                        }, '*');
+                    }
+                }
+            } catch (e) { /* 親が別オリジン等でも観戦モードは継続させる */ }
+
             // リザルト表示時は全体視点に戻す（中継/ズーム中でも見やすいように）
             cameraMode = 'normal';
             broadcastMode = false;
@@ -6585,6 +6679,123 @@
 
         // 起動時の初期化フロー
         switchCourse('sonoda');
+
+        // ============================================================
+        // 育成モード連携：URLパラメータで所有馬の情報を受け取り、
+        // その馬を出走させてレースを自動開始する。
+        // （通常の観戦モードではパラメータが無いため何も起きない）
+        // ============================================================
+        (function initCareerRace() {
+            const params = new URLSearchParams(location.search);
+            if (params.get('career') !== '1') return;
+
+            // レース画面以外のUI（タイトル・観戦ボタン・設定パネル等）を隠す
+            document.body.classList.add('career-embed');
+            const canvasWrap = document.getElementById('raceCanvas')?.closest('div');
+            const keep = new Set();
+            let node = canvasWrap;
+            while (node && node !== document.body) { keep.add(node); node = node.parentElement; }
+            ['commentary','resultPanel','photoFinishOverlay','cameraToggleBtn'].forEach(id => {
+                const el = document.getElementById(id);
+                let n = el;
+                while (n && n !== document.body) { keep.add(n); n = n.parentElement; }
+            });
+            const walk = (parent) => {
+                [...parent.children].forEach(ch => {
+                    if (keep.has(ch)) { walk(ch); return; }
+                    if (ch.tagName === 'SCRIPT' || ch.tagName === 'STYLE') return;
+                    if (ch.contains(document.getElementById('raceCanvas'))) { walk(ch); return; }
+                    ch.classList.add('career-hide');
+                });
+            };
+            walk(document.body);
+
+            /** 育成モード（親ウィンドウ）へ「準備できた」ことを知らせる */
+            function notifyReady() {
+                try {
+                    const target = (window.parent && window.parent !== window) ? window.parent
+                                 : (window.opener ? window.opener : null);
+                    if (target) target.postMessage({ type: 'RACE_READY' }, '*');
+                } catch (e) {}
+            }
+            notifyReady();
+
+            /** 育成モードから、出馬表で確定した出走メンバー一式を受け取ってレースを開始する */
+            window.addEventListener('message', (e) => {
+                const data = e.data;
+                if (!data || data.type !== 'CAREER_START') return;
+
+                const distance = data.distance || 1400;
+                const distSel = document.getElementById('distanceSelect');
+                if (distSel) {
+                    const opt = [...distSel.options].find(o => parseInt(o.value,10) === distance);
+                    if (opt) { distSel.value = opt.value; distSel.dispatchEvent(new Event('change')); }
+                }
+
+                careerFieldSize = data.fieldSize || (data.field ? data.field.length : 12);
+                careerFixedField = Array.isArray(data.field) ? data.field : null;
+                careerPlayerHorse = data.playerHorse || null;
+                careerModeActive = true;
+
+                setTimeout(() => {
+                    if (horsesPool.length === 0) setupHorsesPool();
+                    prepareRaceData();
+                    generateOddsData();
+                    initUI();
+                    resetHorses();
+                    draw();
+                    setTimeout(() => { startRaceProcess(); }, 600);
+                }, 200);
+            });
+
+            /** 育成モード：確定した着順（馬番の並び）を返す。
+             *  写真判定などの演出でエンジン側が止まり、通常の結果通知が来ない場合に
+             *  親ウィンドウ側のウォッチドッグがこれを使って強制的に結果を取得する。 */
+            window.getCareerRaceOrder = function() {
+                return finishedHorses.map(h => h.horseNum);
+            };
+
+            // 古い呼び出し方（URLパラメータのみで馬情報を渡す）にも後方互換で対応
+            if (params.get('speed')) {
+                const playerHorse = {
+                    name: params.get('name') || 'マイホース',
+                    skillName: params.get('skill') || '闘志の走り',
+                    type: params.get('type') || 'senko',
+                    baseWinRate: 0.05,
+                    speedBase: parseFloat(params.get('speed')) || 1.30,
+                    maxStamina: parseFloat(params.get('stamina')) || 150,
+                    spurt: parseFloat(params.get('spurt')) || 1.2,
+                    coat: params.get('coat') || 'bay',
+                    courseType: params.get('course') || 'normal',
+                    surf: 'dirt',
+                    distMin: 800, distMax: 2400,
+                    accelType: params.get('accel') || 'smooth',
+                    isPlayerHorse: true,
+                };
+                const fieldSize = parseInt(params.get('field'), 10) || 12;
+                const distance  = parseInt(params.get('dist'), 10) || 1400;
+                const distSel = document.getElementById('distanceSelect');
+                if (distSel) {
+                    const opt = [...distSel.options].find(o => parseInt(o.value,10) === distance);
+                    if (opt) { distSel.value = opt.value; distSel.dispatchEvent(new Event('change')); }
+                }
+                setTimeout(() => {
+                // 既存の prepareRaceData() をそのまま使うため、
+                // プール側にプレイヤー馬を仕込み、抽選頭数を出走頭数に合わせる。
+                // （勝率・オッズ計算などのロジックを自前で再実装せずに済む）
+                if (horsesPool.length === 0) setupHorsesPool();
+                careerPlayerHorse = playerHorse;
+                careerFieldSize = fieldSize;
+
+                prepareRaceData();
+                generateOddsData();
+                initUI();
+                resetHorses();
+                draw();
+                setTimeout(() => { startRaceProcess(); }, 800);
+                }, 400);
+            }
+        })();
 
     </script>
 </body>
